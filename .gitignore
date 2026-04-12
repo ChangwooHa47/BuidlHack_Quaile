@@ -1,0 +1,16 @@
+/target/
+*.wasm
+.env
+.env.local
+__pycache__/
+*.pyc
+.venv/
+.idea/
+.vscode/
+.DS_Store
+tee/inference/.venv/
+tee/inference/out/
+scripts/e2e/out/
+scripts/deploy/out/
+.secrets/
+node_modules/
