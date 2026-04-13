@@ -20,4 +20,7 @@ borsh = { workspace = true, features = ["derive"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha3 = { workspace = true, optional = true }
-near-sdk = { workspace = true, optional = true }
+near-sdk = { workspace = true, optional = true, features = ["non-contract-usage", "unit-testing"] }
+
+[dev-dependencies]
+sha3 = { workspace = true }
