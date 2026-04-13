@@ -3,6 +3,8 @@
 //! Runs in std (non-contract) mode. Contract-mode / Python parity is
 //! validated by the golden-vector suite in test-02.
 
+#![cfg(not(feature = "contract"))]
+
 use borsh::{BorshDeserialize, BorshSerialize};
 use tee_shared::{
     attestation::{AttestationBundle, AttestationPayload, EvidenceSummary, Verdict},

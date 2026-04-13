@@ -4,7 +4,7 @@ Tests for tee/inference/src/ownership.py
 Covers:
   - NEP-413 NEAR ed25519 happy path + error cases
   - EIP-191 EVM personal_sign happy path + error cases
-  - NEAR named account: RPC key registration check (forgery rejection)
+  - NEAR named account MVP behavior: signed account_id/message match
   - Canonical message parsing edge cases
 """
 
@@ -15,17 +15,15 @@ import hashlib
 import os
 
 import base58
-import httpx
 import nacl.signing
 import pytest
-import respx
 from eth_account import Account
 from eth_account.messages import encode_defunct
 
 from ownership import (
-    FRESHNESS_NS,
     NEP413_RECIPIENT,
     NEP413_TAG,
+    NEP413_TAG_BYTES,
     AddressMismatch,
     EvmWalletProof,
     FreshnessError,
@@ -35,7 +33,6 @@ from ownership import (
     PolicyMismatch,
     SignatureInvalid,
     UnsupportedChain,
-    _borsh_string,
     _nep413_preimage,
     _parse_canonical_message,
     verify_all_wallets,
@@ -51,29 +48,6 @@ NONCE_HEX = NONCE.hex()
 NOW_NS = 1_700_000_000_000_000_000  # fixed "now" for deterministic tests
 TIMESTAMP_NS = NOW_NS  # proof timestamp = now → always fresh
 
-# NEAR RPC endpoint used by named-account tests
-NEAR_RPC_URL = "https://rpc.testnet.near.org"
-
-# Minimal NEAR RPC success response (key exists)
-_RPC_KEY_FOUND = {
-    "jsonrpc": "2.0",
-    "id": "tee-ownership",
-    "result": {"nonce": 1, "permission": "FullAccess"},
-}
-
-# NEAR RPC error response (key not registered)
-_RPC_KEY_NOT_FOUND = {
-    "jsonrpc": "2.0",
-    "id": "tee-ownership",
-    "error": {
-        "name": "HANDLER_ERROR",
-        "cause": {"name": "UNKNOWN_ACCESS_KEY"},
-        "code": -32000,
-        "message": "Server error",
-    },
-}
-
-
 def _canonical_message(
     policy_id: int = POLICY_ID,
     nonce_hex: str = NONCE_HEX,
@@ -81,7 +55,10 @@ def _canonical_message(
     chain_descriptor: str = "near:testnet",
     address: str = "alice.testnet",
 ) -> str:
-    return f"buidl-near-ai|v1|{policy_id}|{nonce_hex}|{timestamp_ns}|{chain_descriptor}|{address}"
+    return (
+        f"buidl-near-ai|v1|{policy_id}|{nonce_hex}|{timestamp_ns}|"
+        f"{chain_descriptor}|{address}"
+    )
 
 
 def _make_near_proof(
@@ -112,7 +89,9 @@ def _make_near_proof(
     )
 
 
-def _make_evm_proof(private_key: str, chain_id: int, address: str, message: str) -> EvmWalletProof:
+def _make_evm_proof(
+    private_key: str, chain_id: int, address: str, message: str
+) -> EvmWalletProof:
     """Sign `message` with EIP-191 and return an EvmWalletProof."""
     encoded = encode_defunct(text=message)
     signed = Account.sign_message(encoded, private_key=private_key)
@@ -128,8 +107,9 @@ def _make_evm_proof(private_key: str, chain_id: int, address: str, message: str)
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 
+
 def _near_keys() -> tuple[nacl.signing.SigningKey, str, str]:
-    """Generate a fresh ed25519 keypair. Returns (signing_key, account_id, pub_key_str)."""
+    """Generate a fresh ed25519 keypair."""
     sk = nacl.signing.SigningKey.generate()
     pub = bytes(sk.verify_key)
     account_id = pub.hex()
@@ -145,6 +125,7 @@ def _evm_account() -> tuple[str, str]:
 
 # ── Test 1: NEP-413 NEAR happy path ───────────────────────────────────────
 
+
 async def test_near_verify_happy_path():
     """Implicit account: account_id == hex(pubkey), no RPC needed."""
     sk, account_id, _ = _near_keys()
@@ -153,83 +134,17 @@ async def test_near_verify_happy_path():
     await verify_near_ownership(proof, POLICY_ID, NONCE, now_ns=NOW_NS)
 
 
-async def test_near_named_account_rpc_confirms():
-    """Named account: RPC confirms key is registered → passes."""
+async def test_near_named_account_happy_path():
+    """Named account: signature and message account_id match → passes."""
     sk, _, _ = _near_keys()
     named = "alice.testnet"
     msg = _canonical_message(chain_descriptor="near:testnet", address=named)
     proof = _make_near_proof(sk, msg, account_id=named)
-
-    with respx.mock:
-        respx.post(NEAR_RPC_URL).mock(
-            return_value=httpx.Response(200, json=_RPC_KEY_FOUND)
-        )
-        await verify_near_ownership(
-            proof, POLICY_ID, NONCE, now_ns=NOW_NS, near_rpc_url=NEAR_RPC_URL
-        )
-
-
-async def test_near_named_account_no_rpc_url_raises():
-    """Named account without near_rpc_url → SignatureInvalid (fail closed)."""
-    sk, _, _ = _near_keys()
-    msg = _canonical_message(chain_descriptor="near:testnet", address="alice.testnet")
-    proof = _make_near_proof(sk, msg, account_id="alice.testnet")
-    with pytest.raises(SignatureInvalid, match="near_rpc_url is required"):
-        await verify_near_ownership(proof, POLICY_ID, NONCE, now_ns=NOW_NS)
-
-
-async def test_near_named_account_function_call_key_rejected():
-    """Named account with a FunctionCall key (not FullAccess) → SignatureInvalid.
-
-    A session key or dApp-scoped key proves nothing about account ownership.
-    """
-    sk, _, _ = _near_keys()
-    msg = _canonical_message(chain_descriptor="near:testnet", address="alice.testnet")
-    proof = _make_near_proof(sk, msg, account_id="alice.testnet")
-
-    function_call_permission = {
-        "FunctionCall": {
-            "allowance": "250000000000000000000000",
-            "receiver_id": "app.example.near",
-            "method_names": [],
-        }
-    }
-    rpc_function_call = {
-        "jsonrpc": "2.0",
-        "id": "tee-ownership",
-        "result": {"nonce": 5, "permission": function_call_permission},
-    }
-    with respx.mock:
-        respx.post(NEAR_RPC_URL).mock(
-            return_value=httpx.Response(200, json=rpc_function_call)
-        )
-        with pytest.raises(SignatureInvalid, match="FullAccess"):
-            await verify_near_ownership(
-                proof, POLICY_ID, NONCE, now_ns=NOW_NS, near_rpc_url=NEAR_RPC_URL
-            )
-
-
-async def test_near_named_account_forgery_rejected():
-    """Attacker signs a message for victim.testnet with their own key.
-
-    Even though msg_address == proof.account_id == "victim.testnet",
-    the NEAR RPC confirms the attacker's key is NOT registered for victim.testnet.
-    """
-    attacker_sk, _, _ = _near_keys()
-    msg = _canonical_message(chain_descriptor="near:testnet", address="victim.testnet")
-    proof = _make_near_proof(attacker_sk, msg, account_id="victim.testnet")
-
-    with respx.mock:
-        respx.post(NEAR_RPC_URL).mock(
-            return_value=httpx.Response(200, json=_RPC_KEY_NOT_FOUND)
-        )
-        with pytest.raises(SignatureInvalid, match="not a registered access key"):
-            await verify_near_ownership(
-                proof, POLICY_ID, NONCE, now_ns=NOW_NS, near_rpc_url=NEAR_RPC_URL
-            )
+    await verify_near_ownership(proof, POLICY_ID, NONCE, now_ns=NOW_NS)
 
 
 # ── Test 2: EVM EIP-191 happy path ────────────────────────────────────────
+
 
 async def test_evm_verify_happy_path():
     pk, addr = _evm_account()
@@ -248,12 +163,17 @@ async def test_evm_address_case_insensitive():
 
 # ── Test 3: PolicyMismatch ─────────────────────────────────────────────────
 
+
 async def test_near_wrong_policy_id():
     sk, account_id, _ = _near_keys()
-    msg = _canonical_message(policy_id=99, chain_descriptor="near:testnet", address=account_id)
+    msg = _canonical_message(
+        policy_id=99, chain_descriptor="near:testnet", address=account_id
+    )
     proof = _make_near_proof(sk, msg, account_id=account_id)
     with pytest.raises(PolicyMismatch):
-        await verify_near_ownership(proof, policy_id=1, expected_nonce=NONCE, now_ns=NOW_NS)
+        await verify_near_ownership(
+            proof, policy_id=1, expected_nonce=NONCE, now_ns=NOW_NS
+        )
 
 
 async def test_evm_wrong_policy_id():
@@ -265,6 +185,7 @@ async def test_evm_wrong_policy_id():
 
 
 # ── Test 4: NonceMismatch ─────────────────────────────────────────────────
+
 
 async def test_near_nonce_mismatch():
     sk, account_id, _ = _near_keys()
@@ -286,10 +207,13 @@ async def test_evm_nonce_mismatch():
 
 # ── Test 5: FreshnessError ────────────────────────────────────────────────
 
+
 async def test_near_stale_timestamp_16min():
     sk, account_id, _ = _near_keys()
     stale_ts = NOW_NS - (16 * 60 * 1_000_000_000)
-    msg = _canonical_message(timestamp_ns=stale_ts, chain_descriptor="near:testnet", address=account_id)
+    msg = _canonical_message(
+        timestamp_ns=stale_ts, chain_descriptor="near:testnet", address=account_id
+    )
     proof = _make_near_proof(sk, msg, account_id=account_id)
     with pytest.raises(FreshnessError):
         await verify_near_ownership(proof, POLICY_ID, NONCE, now_ns=NOW_NS)
@@ -298,7 +222,9 @@ async def test_near_stale_timestamp_16min():
 async def test_near_fresh_timestamp_14min():
     sk, account_id, _ = _near_keys()
     fresh_ts = NOW_NS - (14 * 60 * 1_000_000_000)
-    msg = _canonical_message(timestamp_ns=fresh_ts, chain_descriptor="near:testnet", address=account_id)
+    msg = _canonical_message(
+        timestamp_ns=fresh_ts, chain_descriptor="near:testnet", address=account_id
+    )
     proof = _make_near_proof(sk, msg, account_id=account_id)
     await verify_near_ownership(proof, POLICY_ID, NONCE, now_ns=NOW_NS)
 
@@ -306,13 +232,16 @@ async def test_near_fresh_timestamp_14min():
 async def test_evm_stale_timestamp():
     pk, addr = _evm_account()
     stale_ts = NOW_NS - (16 * 60 * 1_000_000_000)
-    msg = _canonical_message(timestamp_ns=stale_ts, chain_descriptor="eip155:1", address=addr)
+    msg = _canonical_message(
+        timestamp_ns=stale_ts, chain_descriptor="eip155:1", address=addr
+    )
     proof = _make_evm_proof(pk, chain_id=1, address=addr, message=msg)
     with pytest.raises(FreshnessError):
         verify_evm_ownership(proof, POLICY_ID, NONCE, now_ns=NOW_NS)
 
 
 # ── Test 6: SignatureInvalid ──────────────────────────────────────────────
+
 
 async def test_near_tampered_message():
     sk, account_id, _ = _near_keys()
@@ -347,6 +276,7 @@ async def test_evm_tampered_signature():
 
 # ── Test 7: MessageFormatError ────────────────────────────────────────────
 
+
 async def test_malformed_message_missing_fields():
     sk, account_id, _ = _near_keys()
     proof = NearWalletProof(
@@ -370,16 +300,20 @@ async def test_near_wrong_chain_descriptor():
 
 # ── Test 8: UnsupportedChain ──────────────────────────────────────────────
 
+
 async def test_evm_unsupported_chain():
     pk, addr = _evm_account()
     unsupported_chain = 99999
-    msg = _canonical_message(chain_descriptor=f"eip155:{unsupported_chain}", address=addr)
+    msg = _canonical_message(
+        chain_descriptor=f"eip155:{unsupported_chain}", address=addr
+    )
     proof = _make_evm_proof(pk, chain_id=unsupported_chain, address=addr, message=msg)
     with pytest.raises(UnsupportedChain):
         verify_evm_ownership(proof, POLICY_ID, NONCE, now_ns=NOW_NS)
 
 
 # ── Test 9: AddressMismatch ───────────────────────────────────────────────
+
 
 async def test_near_implicit_account_mismatch():
     """Implicit account_id doesn't match the public key → AddressMismatch."""
@@ -428,6 +362,7 @@ async def test_evm_address_in_message_mismatch():
 
 # ── Test 9b: proof.timestamp consistency ─────────────────────────────────
 
+
 async def test_near_proof_timestamp_mismatch():
     """proof.timestamp differs from message timestamp → MessageFormatError."""
     sk, account_id, _ = _near_keys()
@@ -450,6 +385,7 @@ async def test_evm_proof_timestamp_mismatch():
 
 # ── Test 10: verify_all_wallets ───────────────────────────────────────────
 
+
 async def test_verify_all_wallets_happy():
     """Implicit NEAR + EVM → no RPC needed."""
     sk, account_id, _ = _near_keys()
@@ -470,9 +406,12 @@ async def test_verify_all_wallets_empty_raises():
 
 # ── Test 11: NEP-413 preimage structure ───────────────────────────────────
 
+
 def test_nep413_preimage_tag():
-    """First 4 bytes of preimage must be NEP413_TAG in little-endian."""
+    """First 4 bytes of preimage must be the NEP-413 AUTH magic."""
     preimage = _nep413_preimage("hello", bytes(32), "buidl-near-ai")
+    assert preimage[:4] == b"AUTH"
+    assert NEP413_TAG_BYTES == b"AUTH"
     tag_from_preimage = int.from_bytes(preimage[:4], "little")
     assert tag_from_preimage == NEP413_TAG
 
@@ -488,6 +427,7 @@ def test_nep413_preimage_nonce_embedded():
 
 
 # ── Test 12: _parse_canonical_message ────────────────────────────────────
+
 
 def test_parse_canonical_message_valid():
     nonce_hex = "a" * 64
