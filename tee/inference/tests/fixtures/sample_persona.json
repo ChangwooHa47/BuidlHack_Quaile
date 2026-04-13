@@ -1,0 +1,20 @@
+{
+  "near_account": "alice.testnet",
+  "policy_id": 42,
+  "wallets": {
+    "near": [],
+    "evm": [
+      {
+        "chain_id": 1,
+        "address": "0x19e7e376e7c213b7e7e7e46cc70a5dd086daff2a",
+        "signature": "0x2f7f460f6d9c90d280554d0a7ef7566f1eb4d7d5f2c7205a4daff2f7ecb8ef1062c6c57d1fd4acbe4d3cbf08b1b2f3e725c6f19804120b4f54b5fe4f967a33d61b",
+        "message": "buidl-near-ai|v1|42|1111111111111111111111111111111111111111111111111111111111111111|1700000000000000000|eip155:1|0x19e7e376e7c213b7e7e7e46cc70a5dd086daff2a",
+        "timestamp": 1700000000000000000
+      }
+    ]
+  },
+  "self_intro": "Long-term builder with public OSS activity and DAO participation.",
+  "github_oauth_token": null,
+  "nonce": "0x1111111111111111111111111111111111111111111111111111111111111111",
+  "client_timestamp": 1700000000000000000
+}

@@ -23,7 +23,6 @@ from eth_account import Account
 from eth_account.messages import encode_defunct
 
 from ownership import (
-    FRESHNESS_NS,
     NEP413_RECIPIENT,
     NEP413_TAG,
     AddressMismatch,
@@ -35,7 +34,6 @@ from ownership import (
     PolicyMismatch,
     SignatureInvalid,
     UnsupportedChain,
-    _borsh_string,
     _nep413_preimage,
     _parse_canonical_message,
     verify_all_wallets,
@@ -81,7 +79,10 @@ def _canonical_message(
     chain_descriptor: str = "near:testnet",
     address: str = "alice.testnet",
 ) -> str:
-    return f"buidl-near-ai|v1|{policy_id}|{nonce_hex}|{timestamp_ns}|{chain_descriptor}|{address}"
+    return (
+        f"buidl-near-ai|v1|{policy_id}|{nonce_hex}|{timestamp_ns}|"
+        f"{chain_descriptor}|{address}"
+    )
 
 
 def _make_near_proof(
@@ -112,7 +113,9 @@ def _make_near_proof(
     )
 
 
-def _make_evm_proof(private_key: str, chain_id: int, address: str, message: str) -> EvmWalletProof:
+def _make_evm_proof(
+    private_key: str, chain_id: int, address: str, message: str
+) -> EvmWalletProof:
     """Sign `message` with EIP-191 and return an EvmWalletProof."""
     encoded = encode_defunct(text=message)
     signed = Account.sign_message(encoded, private_key=private_key)
@@ -128,8 +131,9 @@ def _make_evm_proof(private_key: str, chain_id: int, address: str, message: str)
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 
+
 def _near_keys() -> tuple[nacl.signing.SigningKey, str, str]:
-    """Generate a fresh ed25519 keypair. Returns (signing_key, account_id, pub_key_str)."""
+    """Generate a fresh ed25519 keypair."""
     sk = nacl.signing.SigningKey.generate()
     pub = bytes(sk.verify_key)
     account_id = pub.hex()
@@ -144,6 +148,7 @@ def _evm_account() -> tuple[str, str]:
 
 
 # ── Test 1: NEP-413 NEAR happy path ───────────────────────────────────────
+
 
 async def test_near_verify_happy_path():
     """Implicit account: account_id == hex(pubkey), no RPC needed."""
@@ -231,6 +236,7 @@ async def test_near_named_account_forgery_rejected():
 
 # ── Test 2: EVM EIP-191 happy path ────────────────────────────────────────
 
+
 async def test_evm_verify_happy_path():
     pk, addr = _evm_account()
     msg = _canonical_message(chain_descriptor="eip155:1", address=addr)
@@ -248,12 +254,17 @@ async def test_evm_address_case_insensitive():
 
 # ── Test 3: PolicyMismatch ─────────────────────────────────────────────────
 
+
 async def test_near_wrong_policy_id():
     sk, account_id, _ = _near_keys()
-    msg = _canonical_message(policy_id=99, chain_descriptor="near:testnet", address=account_id)
+    msg = _canonical_message(
+        policy_id=99, chain_descriptor="near:testnet", address=account_id
+    )
     proof = _make_near_proof(sk, msg, account_id=account_id)
     with pytest.raises(PolicyMismatch):
-        await verify_near_ownership(proof, policy_id=1, expected_nonce=NONCE, now_ns=NOW_NS)
+        await verify_near_ownership(
+            proof, policy_id=1, expected_nonce=NONCE, now_ns=NOW_NS
+        )
 
 
 async def test_evm_wrong_policy_id():
@@ -265,6 +276,7 @@ async def test_evm_wrong_policy_id():
 
 
 # ── Test 4: NonceMismatch ─────────────────────────────────────────────────
+
 
 async def test_near_nonce_mismatch():
     sk, account_id, _ = _near_keys()
@@ -286,10 +298,13 @@ async def test_evm_nonce_mismatch():
 
 # ── Test 5: FreshnessError ────────────────────────────────────────────────
 
+
 async def test_near_stale_timestamp_16min():
     sk, account_id, _ = _near_keys()
     stale_ts = NOW_NS - (16 * 60 * 1_000_000_000)
-    msg = _canonical_message(timestamp_ns=stale_ts, chain_descriptor="near:testnet", address=account_id)
+    msg = _canonical_message(
+        timestamp_ns=stale_ts, chain_descriptor="near:testnet", address=account_id
+    )
     proof = _make_near_proof(sk, msg, account_id=account_id)
     with pytest.raises(FreshnessError):
         await verify_near_ownership(proof, POLICY_ID, NONCE, now_ns=NOW_NS)
@@ -298,7 +313,9 @@ async def test_near_stale_timestamp_16min():
 async def test_near_fresh_timestamp_14min():
     sk, account_id, _ = _near_keys()
     fresh_ts = NOW_NS - (14 * 60 * 1_000_000_000)
-    msg = _canonical_message(timestamp_ns=fresh_ts, chain_descriptor="near:testnet", address=account_id)
+    msg = _canonical_message(
+        timestamp_ns=fresh_ts, chain_descriptor="near:testnet", address=account_id
+    )
     proof = _make_near_proof(sk, msg, account_id=account_id)
     await verify_near_ownership(proof, POLICY_ID, NONCE, now_ns=NOW_NS)
 
@@ -306,13 +323,16 @@ async def test_near_fresh_timestamp_14min():
 async def test_evm_stale_timestamp():
     pk, addr = _evm_account()
     stale_ts = NOW_NS - (16 * 60 * 1_000_000_000)
-    msg = _canonical_message(timestamp_ns=stale_ts, chain_descriptor="eip155:1", address=addr)
+    msg = _canonical_message(
+        timestamp_ns=stale_ts, chain_descriptor="eip155:1", address=addr
+    )
     proof = _make_evm_proof(pk, chain_id=1, address=addr, message=msg)
     with pytest.raises(FreshnessError):
         verify_evm_ownership(proof, POLICY_ID, NONCE, now_ns=NOW_NS)
 
 
 # ── Test 6: SignatureInvalid ──────────────────────────────────────────────
+
 
 async def test_near_tampered_message():
     sk, account_id, _ = _near_keys()
@@ -347,6 +367,7 @@ async def test_evm_tampered_signature():
 
 # ── Test 7: MessageFormatError ────────────────────────────────────────────
 
+
 async def test_malformed_message_missing_fields():
     sk, account_id, _ = _near_keys()
     proof = NearWalletProof(
@@ -370,16 +391,20 @@ async def test_near_wrong_chain_descriptor():
 
 # ── Test 8: UnsupportedChain ──────────────────────────────────────────────
 
+
 async def test_evm_unsupported_chain():
     pk, addr = _evm_account()
     unsupported_chain = 99999
-    msg = _canonical_message(chain_descriptor=f"eip155:{unsupported_chain}", address=addr)
+    msg = _canonical_message(
+        chain_descriptor=f"eip155:{unsupported_chain}", address=addr
+    )
     proof = _make_evm_proof(pk, chain_id=unsupported_chain, address=addr, message=msg)
     with pytest.raises(UnsupportedChain):
         verify_evm_ownership(proof, POLICY_ID, NONCE, now_ns=NOW_NS)
 
 
 # ── Test 9: AddressMismatch ───────────────────────────────────────────────
+
 
 async def test_near_implicit_account_mismatch():
     """Implicit account_id doesn't match the public key → AddressMismatch."""
@@ -428,6 +453,7 @@ async def test_evm_address_in_message_mismatch():
 
 # ── Test 9b: proof.timestamp consistency ─────────────────────────────────
 
+
 async def test_near_proof_timestamp_mismatch():
     """proof.timestamp differs from message timestamp → MessageFormatError."""
     sk, account_id, _ = _near_keys()
@@ -450,6 +476,7 @@ async def test_evm_proof_timestamp_mismatch():
 
 # ── Test 10: verify_all_wallets ───────────────────────────────────────────
 
+
 async def test_verify_all_wallets_happy():
     """Implicit NEAR + EVM → no RPC needed."""
     sk, account_id, _ = _near_keys()
@@ -470,6 +497,7 @@ async def test_verify_all_wallets_empty_raises():
 
 # ── Test 11: NEP-413 preimage structure ───────────────────────────────────
 
+
 def test_nep413_preimage_tag():
     """First 4 bytes of preimage must be NEP413_TAG in little-endian."""
     preimage = _nep413_preimage("hello", bytes(32), "buidl-near-ai")
@@ -488,6 +516,7 @@ def test_nep413_preimage_nonce_embedded():
 
 
 # ── Test 12: _parse_canonical_message ────────────────────────────────────
+
 
 def test_parse_canonical_message_valid():
     nonce_hex = "a" * 64
