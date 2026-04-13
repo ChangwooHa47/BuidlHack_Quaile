@@ -10,6 +10,7 @@ from eth_account import Account
 from eth_account.messages import encode_defunct
 from httpx import ASGITransport, AsyncClient
 
+from attestation_verifier import verify_report_data
 from canonical import payload_hash as compute_payload_hash
 from canonical import serialize_attestation_payload
 from crypto import TeeSigner, recover_address_from_rs_v
@@ -140,8 +141,10 @@ class StubGithubIngestor:
 class StubLlmClient:
     def __init__(self, *, fail_structurize: bool = False):
         self.fail_structurize = fail_structurize
+        self.calls: list[str] = []
 
     async def structurize(self, natural_language: str) -> StructuredRulesModel:
+        self.calls.append("structurize")
         if self.fail_structurize:
             raise RuntimeError("llm unavailable")
         return StructuredRulesModel(
@@ -151,6 +154,7 @@ class StubLlmClient:
         )
 
     async def judge(self, rules, signals, self_intro: str) -> JudgeOutputModel:
+        self.calls.append("judge")
         return JudgeOutputModel(
             verdict="Eligible",
             score=7800,
@@ -164,24 +168,37 @@ class StubLlmClient:
 
 
 class StubReportClient:
+    def __init__(self, *, fail: bool = False):
+        self.fail = fail
+        self.calls: list[tuple[str, str]] = []
+
     async def fetch_report(self, signing_address: str, nonce_hex: str) -> bytes:
+        self.calls.append((signing_address, nonce_hex))
+        if self.fail:
+            raise RuntimeError("attestation unavailable")
         return json.dumps(
             {"signing_address": signing_address, "nonce": nonce_hex}
         ).encode()
 
 
 def make_app(
-    *, evm_fail: bool = False, llm_fail: bool = False, near_signal_count: int = 1
+    *,
+    evm_fail: bool = False,
+    llm_fail: bool = False,
+    near_signal_count: int = 1,
+    report_fail: bool = False,
 ):
     signer = TeeSigner("0x" + "22" * 32, key_id=7)
+    llm_client = StubLlmClient(fail_structurize=llm_fail)
+    report_client = StubReportClient(fail=report_fail)
     deps = PipelineDeps(
         policy_fetcher=StubPolicyFetcher(),
         near_ingestor=StubNearIngestor(count=near_signal_count),
         evm_ingestor=StubEvmIngestor(fail=evm_fail),
         github_ingestor=StubGithubIngestor(),
-        llm_client=StubLlmClient(fail_structurize=llm_fail),
+        llm_client=llm_client,
         signer=signer,
-        report_client=StubReportClient(),
+        report_client=report_client,
         near_rpc_url="https://rpc.testnet.near.org",
     )
     return create_app(AppServices(deps=deps))
@@ -220,6 +237,26 @@ def test_attestation_report_base_url_strips_openai_v1_suffix():
     )
 
 
+def test_create_app_requires_signer_unless_dev_flag(monkeypatch):
+    monkeypatch.delenv("TEE_SIGNER_PRIVKEY", raising=False)
+    monkeypatch.delenv("ALLOW_DEV_TEE_SIGNER", raising=False)
+    with pytest.raises(RuntimeError, match="TEE_SIGNER_PRIVKEY is required"):
+        create_app()
+
+
+def test_verify_report_data_binds_signing_address_and_nonce():
+    signing_address = "0x" + "12" * 20
+    nonce = "34" * 32
+    report_data = bytes.fromhex("12" * 20).ljust(32, b"\x00") + bytes.fromhex(nonce)
+    binds_address, embeds_nonce = verify_report_data(
+        {"signing_address": signing_address, "signing_algo": "ecdsa"},
+        nonce,
+        {"report": {"TD10": {"report_data": report_data.hex()}}},
+    )
+    assert binds_address is True
+    assert embeds_nonce is True
+
+
 @pytest.mark.asyncio
 async def test_attest_happy_path_with_mocks():
     app = make_app()
@@ -240,6 +277,22 @@ async def test_attest_happy_path_with_mocks():
     assert recovered.lower() == expected_signer.lower()
     assert body["tee_report"]
     assert body["bundle"]["payload"]["evidence_summary"]["github_included"] is True
+    report_calls = app.state.services.deps.report_client.calls
+    assert report_calls[0][1] == persona["nonce"].removeprefix("0x")
+    assert report_calls[1][1] == payload_hash.removeprefix("0x")
+    assert app.state.services.deps.llm_client.calls == ["structurize", "judge"]
+
+
+@pytest.mark.asyncio
+async def test_attest_rejects_before_llm_when_remote_attestation_fails():
+    app = make_app(report_fail=True)
+    persona = _persona_dict()
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        resp = await client.post("/v1/attest", json=persona)
+    assert resp.status_code == 502
+    assert app.state.services.deps.llm_client.calls == []
 
 
 @pytest.mark.asyncio

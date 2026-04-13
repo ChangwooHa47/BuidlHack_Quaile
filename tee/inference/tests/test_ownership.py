@@ -25,6 +25,7 @@ from eth_account.messages import encode_defunct
 from ownership import (
     NEP413_RECIPIENT,
     NEP413_TAG,
+    NEP413_TAG_BYTES,
     AddressMismatch,
     EvmWalletProof,
     FreshnessError,
@@ -499,8 +500,10 @@ async def test_verify_all_wallets_empty_raises():
 
 
 def test_nep413_preimage_tag():
-    """First 4 bytes of preimage must be NEP413_TAG in little-endian."""
+    """First 4 bytes of preimage must be the NEP-413 AUTH magic."""
     preimage = _nep413_preimage("hello", bytes(32), "buidl-near-ai")
+    assert preimage[:4] == b"AUTH"
+    assert NEP413_TAG_BYTES == b"AUTH"
     tag_from_preimage = int.from_bytes(preimage[:4], "little")
     assert tag_from_preimage == NEP413_TAG
 

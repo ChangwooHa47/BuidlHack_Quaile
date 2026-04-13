@@ -12,6 +12,7 @@ class Config:
     near_ai_model: str = "deepseek-ai/DeepSeek-V3.1"
     tee_signer_privkey: str = ""
     tee_signer_key_id: int = 1
+    allow_dev_signer: bool = False
     near_rpc_url: str = "https://rpc.testnet.near.org"
     policy_registry_account: str = ""
     ido_escrow_account: str = ""
@@ -25,6 +26,8 @@ class Config:
             near_ai_model=os.getenv("NEAR_AI_MODEL", "deepseek-ai/DeepSeek-V3.1"),
             tee_signer_privkey=os.getenv("TEE_SIGNER_PRIVKEY", ""),
             tee_signer_key_id=int(os.getenv("TEE_SIGNER_KEY_ID", "1")),
+            allow_dev_signer=os.getenv("ALLOW_DEV_TEE_SIGNER", "").lower()
+            in {"1", "true", "yes"},
             near_rpc_url=os.getenv("NEAR_RPC_URL", "https://rpc.testnet.near.org"),
             policy_registry_account=os.getenv("POLICY_REGISTRY_ACCOUNT", ""),
             ido_escrow_account=os.getenv("IDO_ESCROW_ACCOUNT", ""),

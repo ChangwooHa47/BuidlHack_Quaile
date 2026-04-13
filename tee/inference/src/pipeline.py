@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import re
 import time
 from dataclasses import dataclass
@@ -75,6 +76,9 @@ class LlmJudgeFailed(Exception): ...
 
 
 class PiiLeakError(Exception): ...
+
+
+class RemoteAttestationFailed(Exception): ...
 
 
 @dataclass(slots=True)
@@ -186,17 +190,23 @@ async def process_persona(
         if now >= policy.sale_config.subscription_end:
             raise PolicyValidationError("policy subscription window is closed")
 
-        near_signals = await deps.near_ingestor.collect(persona.wallets.near)
-        evm_signals, evm_errors = await deps.evm_ingestor.collect(persona.wallets.evm)
-        github_signal = None
         github_errors: list[str] = []
-        if persona.github_oauth_token:
+
+        async def collect_github() -> object | None:
+            if not persona.github_oauth_token:
+                return None
             try:
-                github_signal = await deps.github_ingestor.collect(
-                    persona.github_oauth_token
-                )
+                return await deps.github_ingestor.collect(persona.github_oauth_token)
             except Exception as exc:  # best-effort per spec
                 github_errors.append(f"github: {type(exc).__name__}")
+                return None
+
+        near_signals, evm_result, github_signal = await asyncio.gather(
+            deps.near_ingestor.collect(persona.wallets.near),
+            deps.evm_ingestor.collect(persona.wallets.evm),
+            collect_github(),
+        )
+        evm_signals, evm_errors = evm_result
 
         aggregated = AggregatedSignalModel(
             near=near_signals,
@@ -205,6 +215,16 @@ async def process_persona(
             partial=bool(evm_errors or github_errors),
             collection_errors=evm_errors + github_errors,
         )
+
+        try:
+            remote_report = await deps.report_client.fetch_report(
+                signing_address=deps.signer.address,
+                nonce_hex=persona.nonce.hex(),
+            )
+        except Exception as exc:
+            raise RemoteAttestationFailed(str(exc)) from exc
+        if not remote_report:
+            raise RemoteAttestationFailed("empty NEAR AI attestation report")
 
         try:
             rules = await deps.llm_client.structurize(policy.natural_language)

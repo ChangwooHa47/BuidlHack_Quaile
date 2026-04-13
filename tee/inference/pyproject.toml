@@ -25,6 +25,9 @@ dependencies = [
     # LLM (NEAR AI Cloud — OpenAI-compatible endpoint)
     "openai>=1.50",
 
+    # NEAR AI Cloud attestation verification
+    "dcap-qvl>=0.3.2",
+
     # NEAR RPC client
     "py-near>=1.1.50",
 ]

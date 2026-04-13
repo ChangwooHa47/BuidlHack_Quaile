@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 from dataclasses import dataclass
 
 import httpx
 from fastapi import FastAPI, HTTPException
 
+from attestation_verifier import verify_near_ai_report
 from config import Config
 from crypto import TeeSigner
 from nearai_client import NearAIClient
@@ -17,6 +19,7 @@ from pipeline import (
     PiiLeakError,
     PipelineDeps,
     PolicyValidationError,
+    RemoteAttestationFailed,
     process_persona,
 )
 from schemas import (
@@ -25,6 +28,9 @@ from schemas import (
     PersonaSubmission,
     PolicyModel,
 )
+
+logger = logging.getLogger(__name__)
+DEV_SIGNER_PRIVKEY = "0x" + "22" * 32
 
 
 class NearRpcPolicyFetcher:
@@ -95,7 +101,9 @@ class NearAiReportClient:
                 },
             )
             resp.raise_for_status()
-            return resp.content
+            content = resp.content
+        await verify_near_ai_report(content, signing_address, nonce_hex)
+        return content
 
 
 @dataclass(slots=True)
@@ -107,7 +115,18 @@ def create_app(services: AppServices | None = None) -> FastAPI:
     app = FastAPI(title="Buidl-NEAR AI TEE Inference Service")
     if services is None:
         config = Config.from_env()
-        signer_key = config.tee_signer_privkey or "0x" + "22" * 32
+        signer_key = config.tee_signer_privkey
+        if not signer_key:
+            if not config.allow_dev_signer:
+                raise RuntimeError(
+                    "TEE_SIGNER_PRIVKEY is required unless "
+                    "ALLOW_DEV_TEE_SIGNER=true"
+                )
+            logger.warning(
+                "TEE_SIGNER_PRIVKEY is unset; using deterministic development "
+                "TEE signer key. Do not use this configuration outside local demos."
+            )
+            signer_key = DEV_SIGNER_PRIVKEY
         signer = TeeSigner(signer_key, config.tee_signer_key_id)
         services = AppServices(
             deps=PipelineDeps(
@@ -152,10 +171,9 @@ def create_app(services: AppServices | None = None) -> FastAPI:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except (PolicyValidationError, PiiLeakError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except RemoteAttestationFailed as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
         except (LlmStructurizeFailed, LlmJudgeFailed) as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     return app
-
-
-app = create_app()

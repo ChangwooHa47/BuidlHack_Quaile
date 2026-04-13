@@ -38,8 +38,9 @@ SCHEMA_VERSION = "v1"
 # Freshness window: ±15 minutes in nanoseconds
 FRESHNESS_NS: int = 15 * 60 * 1_000_000_000
 
-# NEP-413 tag: 2^31 + 413
-NEP413_TAG: int = 2**31 + 413
+# NEP-413 tag: "AUTH" magic.
+NEP413_TAG_BYTES: bytes = b"AUTH"
+NEP413_TAG: int = int.from_bytes(NEP413_TAG_BYTES, "little")
 
 # Recipient used in NEP-413 preimage (fixed for MVP)
 NEP413_RECIPIENT = "buidl-near-ai"
@@ -148,20 +149,23 @@ def _nep413_preimage(
     Build the NEP-413 signed payload (before sha256).
 
     Layout:
-      u32_le(NEP413_TAG) || borsh(message) || nonce[32] ||
-      borsh(recipient) || option_borsh(callback_url)
+      "AUTH" || borsh(message) || nonce[32] || borsh(recipient) ||
+      option_borsh(callback_url)
 
     The sha256 of this preimage is what gets ed25519-signed by the NEAR wallet.
     """
     assert len(nonce) == 32, f"nonce must be 32 bytes, got {len(nonce)}"
 
-    tag_bytes = NEP413_TAG.to_bytes(4, "little")
     cb_bytes = (
         b"\x00" if callback_url is None else b"\x01" + _borsh_string(callback_url)
     )
 
     return (
-        tag_bytes + _borsh_string(message) + nonce + _borsh_string(recipient) + cb_bytes
+        NEP413_TAG_BYTES
+        + _borsh_string(message)
+        + nonce
+        + _borsh_string(recipient)
+        + cb_bytes
     )
 
 
