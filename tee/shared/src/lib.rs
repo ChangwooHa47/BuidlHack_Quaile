@@ -32,16 +32,52 @@ pub mod rules;
 pub mod signal;
 
 // ── AccountId type alias ──────────────────────────────────────────────────
-// Borsh encoding is identical in both modes:
-//   near_sdk::AccountId  → BorshSerialize::serialize(self.as_str(), writer)  → u32_len + utf8
-//   String               → u32_len + utf8
+// Borsh: near_sdk::AccountId and String both encode as u32_len + utf8 bytes.
 #[cfg(feature = "contract")]
 pub use near_sdk::AccountId;
 
-/// Plain `String` stand-in for `near_sdk::AccountId` in std (non-contract) mode.
-/// Borsh encoding is byte-for-byte identical to the contract-mode version.
 #[cfg(not(feature = "contract"))]
 pub type AccountId = String;
+
+// ── U128 type alias ───────────────────────────────────────────────────────
+// ERD uses U128 (near_sdk::json_types::U128) for all token amount fields.
+// In contract mode: re-export near_sdk's U128 directly.
+// In std mode: a local newtype with identical Borsh encoding (u128 LE, 16 bytes).
+#[cfg(feature = "contract")]
+pub use near_sdk::json_types::U128;
+
+/// Stand-in for `near_sdk::json_types::U128` in std (non-contract) mode.
+/// Borsh encoding is byte-for-byte identical: 16-byte little-endian u128.
+#[cfg(not(feature = "contract"))]
+#[derive(
+    borsh::BorshSerialize,
+    borsh::BorshDeserialize,
+    serde::Serialize,
+    serde::Deserialize,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Default,
+)]
+pub struct U128(pub u128);
+
+#[cfg(not(feature = "contract"))]
+impl From<u128> for U128 {
+    fn from(v: u128) -> Self {
+        U128(v)
+    }
+}
+
+#[cfg(not(feature = "contract"))]
+impl From<U128> for u128 {
+    fn from(v: U128) -> Self {
+        v.0
+    }
+}
 
 // ── Re-exports ─────────────────────────────────────────────────────────────
 pub use attestation::{

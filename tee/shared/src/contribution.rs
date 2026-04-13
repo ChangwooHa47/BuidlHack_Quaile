@@ -3,7 +3,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use crate::{
     attestation::Hash32,
     policy::{PolicyId, Timestamp},
-    AccountId,
+    AccountId, U128,
 };
 
 /// An investor's capital deposit for a specific policy.
@@ -15,15 +15,15 @@ pub struct Contribution {
     pub investor: AccountId,
     pub policy_id: PolicyId,
     /// Amount deposited in `payment_token` smallest units.
-    pub amount: u128,
+    pub amount: U128,
     /// `AttestationBundle.payload_hash` that authorised this contribution.
     pub attestation_hash: Hash32,
     /// Settlement result. Immutable once set by `settle()`.
     pub outcome: ContributionOutcome,
     /// Confirmed matched amount after settlement. 0 before settlement.
-    pub matched_amount: u128,
+    pub matched_amount: U128,
     /// Token amount receivable: `matched_amount / price_per_token`. 0 before settlement.
-    pub token_amount: u128,
+    pub token_amount: U128,
     /// Cached from the policy at contribution time; used as `ft_transfer` target in `claim()`.
     pub token_contract: AccountId,
     /// Set to `true` after `claim()` succeeds. Cannot be undone.

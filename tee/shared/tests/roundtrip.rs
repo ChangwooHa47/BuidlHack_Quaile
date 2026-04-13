@@ -11,6 +11,7 @@ use tee_shared::{
     persona::{build_canonical_message, EvmWalletProof, NearWalletProof, Persona, Wallets, FRESHNESS_NS},
     policy::{PaymentToken, Policy, PolicyStatus, SaleConfig},
     rules::{RuleWeights, StructuredRules},
+    U128,
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -28,8 +29,8 @@ where
 fn dummy_sale_config() -> SaleConfig {
     SaleConfig {
         token_contract: "token.testnet".to_string(),
-        total_allocation: 1_000_000,
-        price_per_token: 1_000,
+        total_allocation: U128(1_000_000),
+        price_per_token: U128(1_000),
         payment_token: PaymentToken::Near,
         subscription_start: 1_000,
         subscription_end: 2_000,
@@ -159,11 +160,11 @@ fn contribution_roundtrip() {
     let c = Contribution {
         investor: "investor.testnet".to_string(),
         policy_id: 1,
-        amount: 5_000_000_000_000_000_000_000_000,
+        amount: U128(5_000_000_000_000_000_000_000_000),
         attestation_hash: [0xAAu8; 32],
         outcome: ContributionOutcome::NotSettled,
-        matched_amount: 0,
-        token_amount: 0,
+        matched_amount: U128(0),
+        token_amount: U128(0),
         token_contract: "token.testnet".to_string(),
         claim_done: false,
         refund_done: false,
@@ -202,8 +203,8 @@ fn invariant_sale_config_time_ordering() {
 #[test]
 fn invariant_sale_config_nonzero_allocation() {
     let c = dummy_sale_config();
-    assert!(c.total_allocation > 0);
-    assert!(c.price_per_token > 0);
+    assert!(c.total_allocation > U128(0));
+    assert!(c.price_per_token > U128(0));
 }
 
 #[test]

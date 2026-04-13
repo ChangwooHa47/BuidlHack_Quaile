@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     attestation::Hash32,
     policy::Timestamp,
-    AccountId,
+    AccountId, U128,
 };
 
 // ── On-chain data collected by the TEE ingestion layer ────────────────────
@@ -19,7 +19,7 @@ pub struct NearWalletSignal {
     pub holding_days: u32,
     pub total_txs: u32,
     /// Native NEAR balance in yoctoNEAR.
-    pub native_balance: u128,
+    pub native_balance: U128,
     pub fts: Vec<FtHolding>,
     pub dao_votes: Vec<DaoVote>,
 }
@@ -43,7 +43,7 @@ pub struct EvmWalletSignal {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct FtHolding {
     pub token: AccountId,
-    pub balance: u128,
+    pub balance: U128,
     pub first_acquired: Timestamp,
 }
 

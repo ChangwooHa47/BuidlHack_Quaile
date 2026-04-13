@@ -1,6 +1,6 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::AccountId;
+use crate::{AccountId, U128};
 
 /// NEAR block timestamp unit: nanoseconds since Unix epoch.
 pub type Timestamp = u64;
@@ -48,9 +48,9 @@ pub enum PolicyStatus {
 pub struct SaleConfig {
     pub token_contract: AccountId,
     /// Total IDO token allocation in token-smallest-units.
-    pub total_allocation: u128,
+    pub total_allocation: U128,
     /// Price per token in `payment_token` smallest units.
-    pub price_per_token: u128,
+    pub price_per_token: U128,
     pub payment_token: PaymentToken,
     /// Block timestamp at which Upcoming → Subscribing transition becomes valid.
     pub subscription_start: Timestamp,
