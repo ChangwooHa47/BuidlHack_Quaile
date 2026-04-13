@@ -1,0 +1,7 @@
+# Requires rustup. If using Homebrew Cargo, install rustup separately:
+#   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+#   rustup target add wasm32-unknown-unknown
+[toolchain]
+channel = "1.78.0"
+components = ["rustfmt", "clippy"]
+targets = ["wasm32-unknown-unknown"]

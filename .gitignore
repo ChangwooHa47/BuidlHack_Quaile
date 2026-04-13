@@ -1,16 +1,28 @@
+# Rust
 /target/
 *.wasm
-.env
-.env.local
+
+# Python
 __pycache__/
 *.pyc
+*.pyo
 .venv/
-.idea/
-.vscode/
-.DS_Store
 tee/inference/.venv/
 tee/inference/out/
+.ruff_cache/
+
+# Secrets
+.env
+.env.local
+.env.*.local
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Misc
+planning/.tmp/
 scripts/e2e/out/
-scripts/deploy/out/
-.secrets/
-node_modules/
+.DS_Store
