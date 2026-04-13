@@ -178,6 +178,37 @@ async def test_near_named_account_no_rpc_url_raises():
         await verify_near_ownership(proof, POLICY_ID, NONCE, now_ns=NOW_NS)
 
 
+async def test_near_named_account_function_call_key_rejected():
+    """Named account with a FunctionCall key (not FullAccess) → SignatureInvalid.
+
+    A session key or dApp-scoped key proves nothing about account ownership.
+    """
+    sk, _, _ = _near_keys()
+    msg = _canonical_message(chain_descriptor="near:testnet", address="alice.testnet")
+    proof = _make_near_proof(sk, msg, account_id="alice.testnet")
+
+    function_call_permission = {
+        "FunctionCall": {
+            "allowance": "250000000000000000000000",
+            "receiver_id": "app.example.near",
+            "method_names": [],
+        }
+    }
+    rpc_function_call = {
+        "jsonrpc": "2.0",
+        "id": "tee-ownership",
+        "result": {"nonce": 5, "permission": function_call_permission},
+    }
+    with respx.mock:
+        respx.post(NEAR_RPC_URL).mock(
+            return_value=httpx.Response(200, json=rpc_function_call)
+        )
+        with pytest.raises(SignatureInvalid, match="FullAccess"):
+            await verify_near_ownership(
+                proof, POLICY_ID, NONCE, now_ns=NOW_NS, near_rpc_url=NEAR_RPC_URL
+            )
+
+
 async def test_near_named_account_forgery_rejected():
     """Attacker signs a message for victim.testnet with their own key.
 

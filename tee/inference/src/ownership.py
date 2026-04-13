@@ -215,6 +215,13 @@ async def _check_near_key_registered(
             f"for account {account_id!r}"
         )
 
+    permission = data["result"].get("permission")
+    if permission != "FullAccess":
+        raise SignatureInvalid(
+            f"Public key {public_key!r} for account {account_id!r} "
+            f"has permission {permission!r}, but FullAccess is required for ownership proof"
+        )
+
 # ── Public API ─────────────────────────────────────────────────────────────
 
 async def verify_near_ownership(
