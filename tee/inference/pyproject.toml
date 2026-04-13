@@ -1,0 +1,45 @@
+[project]
+name = "buidl-near-ai-tee"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    # Web framework
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "httpx>=0.27",
+
+    # EVM wallet ownership verification & signing
+    "web3>=7.2",
+    "eth-account>=0.13",
+    "eth-keys>=0.5",               # secp256k1 raw hash signing (tee-05)
+    "eth-hash[pycryptodome]>=0.7", # keccak256; replaces pysha3 (Python 3.11+ safe)
+    "pycryptodome>=3.20",
+
+    # NEAR wallet ownership verification (NEP-413 ed25519)
+    "pynacl>=1.5",
+    "base58>=2.1",
+
+    # Data validation
+    "pydantic>=2.9",
+
+    # LLM (NEAR AI Cloud — OpenAI-compatible endpoint)
+    "openai>=1.50",
+
+    # NEAR RPC client
+    "py-near>=1.1.50",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.24",
+    "pytest-httpx>=0.33",
+    "respx>=0.21",
+    "ruff>=0.7",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
