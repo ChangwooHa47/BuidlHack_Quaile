@@ -1,16 +1,17 @@
 import Header from "@/components/Header";
 import ProjectCard from "@/components/ProjectCard";
+import type { ProjectMeta } from "@/types";
 
 const FILTERS = ["All", "Upcoming", "Open", "Live", "Closed"] as const;
 
-const PROJECTS = [
+const PROJECTS: ProjectMeta[] = [
   {
     slug: "walrus",
     name: "Walrus",
     ticker: "W",
     description:
       "A decentralized storage and data availability protocol designed for large binary files on Sui.",
-    status: "Upcoming" as const,
+    status: "Upcoming" ,
     meta: {
       "Subscription Opens": "Apr 22, 2026",
       "TGE Date": "May 10, 2026",
@@ -22,7 +23,7 @@ const PROJECTS = [
     ticker: "M",
     description:
       "The leading DEX on Sui, offering top APRs for LPs. Powered by the ve(3,3) model.",
-    status: "Open" as const,
+    status: "Open" ,
     audiences: ["Long-term Conviction Holder", "Crypto KOL / Influencer", "Ecosystem Builder / Dev"],
     meta: {},
   },
@@ -32,7 +33,7 @@ const PROJECTS = [
     ticker: "N",
     description:
       "Native one-stop liquidity protocol on Sui. Lend, borrow, and earn with deep capital efficiency.",
-    status: "Live" as const,
+    status: "Live" ,
     meta: {
       "Current Price": "$0.124",
       "24h Volume": "$8.4M",
