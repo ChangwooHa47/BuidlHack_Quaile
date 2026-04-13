@@ -20,8 +20,6 @@ tee/
 
 scripts/            Deployment & e2e demo scripts
 
-docs/               Design docs (evaluation logic, interfaces)
-
 planning/           PRD, ERD, tasks, reviews (planning artifacts)
 ```
 
@@ -48,4 +46,3 @@ uv run pytest -q
 - [`planning/ONE_PAGER.md`](planning/ONE_PAGER.md) — Product overview & demo flow
 - [`planning/PRD.md`](planning/PRD.md) — Functional & non-functional requirements
 - [`planning/ERD.md`](planning/ERD.md) — Data model (on-chain / off-chain)
-- [`docs/evaluation_logic.md`](docs/evaluation_logic.md) — LLM judge criteria & prompt structure
