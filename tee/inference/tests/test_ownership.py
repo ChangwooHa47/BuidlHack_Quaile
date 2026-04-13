@@ -136,7 +136,7 @@ def test_near_verify_happy_path():
 
 
 def test_near_named_account_trusted():
-    """Named accounts skip implicit-account check — pubkey is trusted from wallet selector."""
+    """Named accounts pass when signed message address == account_id."""
     sk, _, _ = _near_keys()
     named = "alice.testnet"
     msg = _canonical_message(chain_descriptor="near:testnet", address=named)
@@ -302,7 +302,7 @@ def test_evm_unsupported_chain():
         verify_evm_ownership(proof, POLICY_ID, NONCE, now_ns=NOW_NS)
 
 
-# ── Test 9: AddressMismatch (NEAR implicit account) ───────────────────────
+# ── Test 9: AddressMismatch ───────────────────────────────────────────────
 
 def test_near_implicit_account_mismatch():
     """Implicit account_id doesn't match the public key → AddressMismatch."""
@@ -315,6 +315,69 @@ def test_near_implicit_account_mismatch():
     proof = _make_near_proof(sk, msg, account_id=wrong_account_id)
     with pytest.raises(AddressMismatch):
         verify_near_ownership(proof, POLICY_ID, NONCE, now_ns=NOW_NS)
+
+
+def test_near_account_id_tampered():
+    """Outer account_id tampered after signing (forgery) → AddressMismatch.
+
+    Attack: attacker signs a valid message for attacker.testnet, then replaces
+    proof.account_id with victim.testnet. The address in the signed message
+    must match account_id, so this is rejected.
+    """
+    sk, _, _ = _near_keys()
+    attacker_name = "attacker.testnet"
+    msg = _canonical_message(chain_descriptor="near:testnet", address=attacker_name)
+    proof = _make_near_proof(sk, msg, account_id=attacker_name)
+    # Tamper: claim to be victim
+    proof.account_id = "victim.testnet"
+    with pytest.raises(AddressMismatch):
+        verify_near_ownership(proof, POLICY_ID, NONCE, now_ns=NOW_NS)
+
+
+def test_evm_address_in_message_mismatch():
+    """Message address differs from proof.address → AddressMismatch.
+
+    The address field in the signed canonical message must equal proof.address.
+    """
+    pk, addr = _evm_account()
+    _, other_addr = _evm_account()
+    # Message claims other_addr, but proof.address is addr
+    msg = _canonical_message(chain_descriptor="eip155:1", address=other_addr)
+    encoded = encode_defunct(text=msg)
+    signed = Account.sign_message(encoded, private_key=pk)
+    _, _, timestamp_ns, _, _ = _parse_canonical_message(msg)
+    proof = EvmWalletProof(
+        chain_id=1,
+        address=addr,  # differs from message address
+        signature=signed.signature.hex(),
+        message=msg,
+        timestamp=timestamp_ns,
+    )
+    with pytest.raises(AddressMismatch):
+        verify_evm_ownership(proof, POLICY_ID, NONCE, now_ns=NOW_NS)
+
+
+# ── Test 9b: proof.timestamp consistency ─────────────────────────────────
+
+def test_near_proof_timestamp_mismatch():
+    """proof.timestamp differs from message timestamp → MessageFormatError."""
+    sk, account_id, _ = _near_keys()
+    msg = _canonical_message(chain_descriptor="near:testnet", address=account_id)
+    proof = _make_near_proof(sk, msg, account_id=account_id)
+    # Tamper the outer timestamp field without touching the signed message
+    proof.timestamp = NOW_NS - (30 * 60 * 1_000_000_000)
+    with pytest.raises(MessageFormatError):
+        verify_near_ownership(proof, POLICY_ID, NONCE, now_ns=NOW_NS)
+
+
+def test_evm_proof_timestamp_mismatch():
+    """proof.timestamp differs from message timestamp → MessageFormatError."""
+    pk, addr = _evm_account()
+    msg = _canonical_message(chain_descriptor="eip155:1", address=addr)
+    proof = _make_evm_proof(pk, chain_id=1, address=addr, message=msg)
+    proof.timestamp = NOW_NS - (30 * 60 * 1_000_000_000)
+    with pytest.raises(MessageFormatError):
+        verify_evm_ownership(proof, POLICY_ID, NONCE, now_ns=NOW_NS)
 
 
 # ── Test 10: verify_all_wallets ───────────────────────────────────────────

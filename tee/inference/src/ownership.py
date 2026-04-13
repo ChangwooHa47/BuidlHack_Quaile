@@ -215,6 +215,12 @@ def verify_near_ownership(
     # 3. Freshness
     _check_freshness(timestamp_ns, now_ns)
 
+    # 3b. proof.timestamp must equal the timestamp embedded in the signed message
+    if proof.timestamp != timestamp_ns:
+        raise MessageFormatError(
+            f"proof.timestamp {proof.timestamp} != message timestamp {timestamp_ns}"
+        )
+
     # 4. Chain descriptor must start with "near:"
     if not chain_descriptor.startswith("near:"):
         raise MessageFormatError(
@@ -251,8 +257,16 @@ def verify_near_ownership(
     except nacl.exceptions.BadSignatureError as exc:
         raise SignatureInvalid(f"ed25519 verification failed: {exc}") from exc
 
-    # 8. Implicit account check: if account_id looks like a hex pubkey (64 chars),
-    #    it must equal hex(pub_bytes). Named accounts (e.g. alice.testnet) are trusted.
+    # 8. account_id must match the address field in the signed message.
+    #    Prevents tampering with the outer account_id after signing.
+    if msg_address != proof.account_id:
+        raise AddressMismatch(
+            f"Message address {msg_address!r} != account_id {proof.account_id!r}"
+        )
+
+    # 9. For implicit accounts (64 hex chars): additionally verify account_id == hex(pubkey).
+    #    Named accounts cannot be cryptographically bound to a key without an RPC lookup;
+    #    step 8 above ensures the signed message matches the claimed account_id.
     is_implicit = len(proof.account_id) == 64 and all(
         c in "0123456789abcdef" for c in proof.account_id.lower()
     )
@@ -300,6 +314,12 @@ def verify_evm_ownership(
     # 3. Freshness
     _check_freshness(timestamp_ns, now_ns)
 
+    # 3b. proof.timestamp must equal the timestamp embedded in the signed message
+    if proof.timestamp != timestamp_ns:
+        raise MessageFormatError(
+            f"proof.timestamp {proof.timestamp} != message timestamp {timestamp_ns}"
+        )
+
     # 4. Supported chain
     if proof.chain_id not in SUPPORTED_EVM_CHAINS:
         raise UnsupportedChain(f"chain_id {proof.chain_id} is not supported")
@@ -309,6 +329,13 @@ def verify_evm_ownership(
     if chain_descriptor != expected_descriptor:
         raise MessageFormatError(
             f"chain_descriptor {chain_descriptor!r} != expected {expected_descriptor!r}"
+        )
+
+    # 5b. Address in the signed message must match the claimed proof.address.
+    #     Prevents tampering with the outer address field after signing.
+    if msg_address.lower() != proof.address.lower():
+        raise AddressMismatch(
+            f"Message address {msg_address!r} != proof.address {proof.address!r}"
         )
 
     # 6. Recover signer from EIP-191 signature
