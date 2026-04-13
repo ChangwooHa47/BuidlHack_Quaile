@@ -1,0 +1,23 @@
+[package]
+name = "tee-shared"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Shared types for Buidl-NEAR AI (SSOT for contracts and TEE service)"
+
+# ── Feature flags ──────────────────────────────────────────────────────────
+# std (default): native Rust, sha3 keccak256. Used by test utilities & test-02.
+# contract:      NEAR wasm32 mode, near-sdk AccountId + env::keccak256_array.
+#
+# Contract compile: cargo build -p tee-shared --no-default-features --features contract
+[features]
+default = ["std"]
+std = ["dep:sha3"]
+contract = ["dep:near-sdk"]
+
+[dependencies]
+borsh = { workspace = true, features = ["derive"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha3 = { workspace = true, optional = true }
+near-sdk = { workspace = true, optional = true }

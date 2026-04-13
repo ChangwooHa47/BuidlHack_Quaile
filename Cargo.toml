@@ -5,7 +5,12 @@ resolver = "2"
 #   contract-01 → contracts/policy-registry
 #   contract-02 → contracts/attestation-verifier
 #   contract-03 → contracts/ido-escrow
-members = []
+members = [
+    "tee/shared",
+    # contract-01 → contracts/policy-registry       (added in task/contract-01)
+    # contract-02 → contracts/attestation-verifier  (added in task/contract-02)
+    # contract-03 → contracts/ido-escrow            (added in task/contract-03a)
+]
 
 [workspace.package]
 edition = "2021"
