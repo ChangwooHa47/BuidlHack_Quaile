@@ -73,7 +73,8 @@ export function IdentityProvider({ children }: { children: ReactNode }) {
     setGithubConnected(false);
   }, []);
 
-  const isIdentityComplete = !!accountId && (evmWallets.length > 0 || !!accountId);
+  const hasSignedEvmWallet = evmWallets.some((w) => w.signed);
+  const isIdentityComplete = !!accountId && hasSignedEvmWallet;
 
   return (
     <IdentityContext.Provider

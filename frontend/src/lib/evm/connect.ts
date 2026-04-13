@@ -8,7 +8,7 @@ export async function connectEvmWallet(): Promise<string> {
   const provider = new BrowserProvider(window.ethereum);
   const accounts = await provider.send("eth_requestAccounts", []);
   if (!accounts[0]) throw new Error("No account returned");
-  return accounts[0] as string;
+  return (accounts[0] as string).toLowerCase();
 }
 
 export async function signEvmMessage(message: string): Promise<string> {

@@ -10,6 +10,7 @@ import {
 } from "react";
 import type { WalletSelector, AccountState } from "@near-wallet-selector/core";
 import { getWalletSelector } from "@/lib/near/wallet-selector";
+import { CONTRACT_IDS } from "@/lib/near/config";
 
 interface WalletContextValue {
   selector: WalletSelector | null;
@@ -35,28 +36,34 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    getWalletSelector().then((sel) => {
-      setSelector(sel);
+    let sub: { unsubscribe: () => void } | undefined;
 
-      const state = sel.store.getState();
-      const account = state.accounts.find((a: AccountState) => a.active);
-      if (account) setAccountId(account.accountId);
-      setIsLoading(false);
+    getWalletSelector()
+      .then((sel) => {
+        setSelector(sel);
 
-      const sub = sel.store.observable.subscribe((nextState) => {
-        const active = nextState.accounts.find((a: AccountState) => a.active);
-        setAccountId(active?.accountId ?? null);
+        const state = sel.store.getState();
+        const account = state.accounts.find((a: AccountState) => a.active);
+        if (account) setAccountId(account.accountId);
+        setIsLoading(false);
+
+        sub = sel.store.observable.subscribe((nextState) => {
+          const active = nextState.accounts.find((a: AccountState) => a.active);
+          setAccountId(active?.accountId ?? null);
+        });
+      })
+      .catch(() => {
+        setIsLoading(false);
       });
 
-      return () => sub.unsubscribe();
-    });
+    return () => sub?.unsubscribe();
   }, []);
 
   const signIn = useCallback(async () => {
     if (!selector) return;
     const wallet = await selector.wallet("my-near-wallet");
-    // @ts-expect-error -- wallet selector types require accounts for hardware wallets, but BrowserWallet doesn't need it
-    await wallet.signIn({ contractId: "" });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (wallet as any).signIn({ contractId: CONTRACT_IDS.idoEscrow });
   }, [selector]);
 
   const signOut = useCallback(async () => {
