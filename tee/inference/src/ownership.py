@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 import base58
+import httpx
 import nacl.signing
 from eth_account import Account
 from eth_account.messages import encode_defunct
@@ -175,13 +176,53 @@ def _check_freshness(timestamp_ns: int, now_ns: Optional[int] = None) -> None:
             f"(max {FRESHNESS_NS / 1e9:.0f}s)"
         )
 
+
+async def _check_near_key_registered(
+    account_id: str,
+    public_key: str,
+    rpc_url: str,
+) -> None:
+    """
+    Verify that public_key is a registered active access key for account_id
+    via NEAR JSON-RPC view_access_key.
+
+    Raises SignatureInvalid if the key is not found or the RPC call fails.
+    """
+    payload = {
+        "jsonrpc": "2.0",
+        "id": "tee-ownership",
+        "method": "query",
+        "params": {
+            "request_type": "view_access_key",
+            "finality": "final",
+            "account_id": account_id,
+            "public_key": public_key,
+        },
+    }
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(rpc_url, json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+    except httpx.HTTPError as exc:
+        raise SignatureInvalid(f"NEAR RPC request failed: {exc}") from exc
+    except Exception as exc:
+        raise SignatureInvalid(f"NEAR RPC unexpected error: {exc}") from exc
+
+    if "error" in data or "result" not in data:
+        raise SignatureInvalid(
+            f"Public key {public_key!r} is not a registered access key "
+            f"for account {account_id!r}"
+        )
+
 # ── Public API ─────────────────────────────────────────────────────────────
 
-def verify_near_ownership(
+async def verify_near_ownership(
     proof: NearWalletProof,
     policy_id: int,
     expected_nonce: bytes,
     now_ns: Optional[int] = None,
+    near_rpc_url: Optional[str] = None,
 ) -> None:
     """
     Verify a NEAR wallet ownership proof via NEP-413 ed25519 signing.
@@ -189,12 +230,17 @@ def verify_near_ownership(
     Steps:
       1. Parse and validate canonical message format
       2. Check policy_id and nonce match
-      3. Check freshness (±15 min)
+      3. Check freshness (±15 min); verify proof.timestamp matches message timestamp
       4. Verify chain_descriptor is a NEAR chain
       5. Decode ed25519 public key from "ed25519:<base58>"
       6. Decode base64 signature
       7. Verify ed25519(sha256(nep413_preimage)) against signature
-      8. For implicit accounts (64 hex chars): verify account_id == hex(pubkey)
+      8. Verify account_id matches address in signed message
+      9. For implicit accounts (64 hex chars): verify account_id == hex(pubkey)
+      10. For named accounts: verify public_key is registered on-chain via NEAR RPC
+
+    For named accounts, near_rpc_url is required. Without it the call raises
+    SignatureInvalid (fail closed — no silent acceptance of unverifiable claims).
 
     Raises: MessageFormatError, PolicyMismatch, NonceMismatch, FreshnessError,
             SignatureInvalid, AddressMismatch
@@ -264,9 +310,7 @@ def verify_near_ownership(
             f"Message address {msg_address!r} != account_id {proof.account_id!r}"
         )
 
-    # 9. For implicit accounts (64 hex chars): additionally verify account_id == hex(pubkey).
-    #    Named accounts cannot be cryptographically bound to a key without an RPC lookup;
-    #    step 8 above ensures the signed message matches the claimed account_id.
+    # 9. For implicit accounts (64 hex chars): verify account_id == hex(pubkey).
     is_implicit = len(proof.account_id) == 64 and all(
         c in "0123456789abcdef" for c in proof.account_id.lower()
     )
@@ -275,6 +319,16 @@ def verify_near_ownership(
             f"Implicit account_id {proof.account_id!r} "
             f"does not match pubkey hex {pub_bytes.hex()!r}"
         )
+
+    # 10. For named accounts: verify the public key is registered on-chain.
+    #     Without this check, any ed25519 key can forge ownership of any named account
+    #     by signing a message that includes the victim's account_id.
+    if not is_implicit:
+        if near_rpc_url is None:
+            raise SignatureInvalid(
+                "near_rpc_url is required to verify named NEAR account key registration"
+            )
+        await _check_near_key_registered(proof.account_id, proof.public_key, near_rpc_url)
 
 
 def verify_evm_ownership(
@@ -352,23 +406,25 @@ def verify_evm_ownership(
         )
 
 
-def verify_all_wallets(
+async def verify_all_wallets(
     near_proofs: list[NearWalletProof],
     evm_proofs: list[EvmWalletProof],
     policy_id: int,
     expected_nonce: bytes,
     now_ns: Optional[int] = None,
+    near_rpc_url: Optional[str] = None,
 ) -> None:
     """
     Verify all wallet proofs in a Persona.
 
     Raises OwnershipError (subclass) on the first failure.
+    near_rpc_url is required when any NEAR named account proof is present.
     """
     if not near_proofs and not evm_proofs:
         raise MessageFormatError("Persona must contain at least one wallet proof")
 
     for proof in near_proofs:
-        verify_near_ownership(proof, policy_id, expected_nonce, now_ns)
+        await verify_near_ownership(proof, policy_id, expected_nonce, now_ns, near_rpc_url)
 
     for proof in evm_proofs:
         verify_evm_ownership(proof, policy_id, expected_nonce, now_ns)
