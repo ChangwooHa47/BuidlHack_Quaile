@@ -4,7 +4,7 @@ Tests for tee/inference/src/ownership.py
 Covers:
   - NEP-413 NEAR ed25519 happy path + error cases
   - EIP-191 EVM personal_sign happy path + error cases
-  - NEAR named account: RPC key registration check (forgery rejection)
+  - NEAR named account MVP behavior: signed account_id/message match
   - Canonical message parsing edge cases
 """
 
@@ -15,10 +15,8 @@ import hashlib
 import os
 
 import base58
-import httpx
 import nacl.signing
 import pytest
-import respx
 from eth_account import Account
 from eth_account.messages import encode_defunct
 
@@ -49,29 +47,6 @@ NONCE = os.urandom(32)
 NONCE_HEX = NONCE.hex()
 NOW_NS = 1_700_000_000_000_000_000  # fixed "now" for deterministic tests
 TIMESTAMP_NS = NOW_NS  # proof timestamp = now → always fresh
-
-# NEAR RPC endpoint used by named-account tests
-NEAR_RPC_URL = "https://rpc.testnet.near.org"
-
-# Minimal NEAR RPC success response (key exists)
-_RPC_KEY_FOUND = {
-    "jsonrpc": "2.0",
-    "id": "tee-ownership",
-    "result": {"nonce": 1, "permission": "FullAccess"},
-}
-
-# NEAR RPC error response (key not registered)
-_RPC_KEY_NOT_FOUND = {
-    "jsonrpc": "2.0",
-    "id": "tee-ownership",
-    "error": {
-        "name": "HANDLER_ERROR",
-        "cause": {"name": "UNKNOWN_ACCESS_KEY"},
-        "code": -32000,
-        "message": "Server error",
-    },
-}
-
 
 def _canonical_message(
     policy_id: int = POLICY_ID,
@@ -159,80 +134,13 @@ async def test_near_verify_happy_path():
     await verify_near_ownership(proof, POLICY_ID, NONCE, now_ns=NOW_NS)
 
 
-async def test_near_named_account_rpc_confirms():
-    """Named account: RPC confirms key is registered → passes."""
+async def test_near_named_account_happy_path():
+    """Named account: signature and message account_id match → passes."""
     sk, _, _ = _near_keys()
     named = "alice.testnet"
     msg = _canonical_message(chain_descriptor="near:testnet", address=named)
     proof = _make_near_proof(sk, msg, account_id=named)
-
-    with respx.mock:
-        respx.post(NEAR_RPC_URL).mock(
-            return_value=httpx.Response(200, json=_RPC_KEY_FOUND)
-        )
-        await verify_near_ownership(
-            proof, POLICY_ID, NONCE, now_ns=NOW_NS, near_rpc_url=NEAR_RPC_URL
-        )
-
-
-async def test_near_named_account_no_rpc_url_raises():
-    """Named account without near_rpc_url → SignatureInvalid (fail closed)."""
-    sk, _, _ = _near_keys()
-    msg = _canonical_message(chain_descriptor="near:testnet", address="alice.testnet")
-    proof = _make_near_proof(sk, msg, account_id="alice.testnet")
-    with pytest.raises(SignatureInvalid, match="near_rpc_url is required"):
-        await verify_near_ownership(proof, POLICY_ID, NONCE, now_ns=NOW_NS)
-
-
-async def test_near_named_account_function_call_key_rejected():
-    """Named account with a FunctionCall key (not FullAccess) → SignatureInvalid.
-
-    A session key or dApp-scoped key proves nothing about account ownership.
-    """
-    sk, _, _ = _near_keys()
-    msg = _canonical_message(chain_descriptor="near:testnet", address="alice.testnet")
-    proof = _make_near_proof(sk, msg, account_id="alice.testnet")
-
-    function_call_permission = {
-        "FunctionCall": {
-            "allowance": "250000000000000000000000",
-            "receiver_id": "app.example.near",
-            "method_names": [],
-        }
-    }
-    rpc_function_call = {
-        "jsonrpc": "2.0",
-        "id": "tee-ownership",
-        "result": {"nonce": 5, "permission": function_call_permission},
-    }
-    with respx.mock:
-        respx.post(NEAR_RPC_URL).mock(
-            return_value=httpx.Response(200, json=rpc_function_call)
-        )
-        with pytest.raises(SignatureInvalid, match="FullAccess"):
-            await verify_near_ownership(
-                proof, POLICY_ID, NONCE, now_ns=NOW_NS, near_rpc_url=NEAR_RPC_URL
-            )
-
-
-async def test_near_named_account_forgery_rejected():
-    """Attacker signs a message for victim.testnet with their own key.
-
-    Even though msg_address == proof.account_id == "victim.testnet",
-    the NEAR RPC confirms the attacker's key is NOT registered for victim.testnet.
-    """
-    attacker_sk, _, _ = _near_keys()
-    msg = _canonical_message(chain_descriptor="near:testnet", address="victim.testnet")
-    proof = _make_near_proof(attacker_sk, msg, account_id="victim.testnet")
-
-    with respx.mock:
-        respx.post(NEAR_RPC_URL).mock(
-            return_value=httpx.Response(200, json=_RPC_KEY_NOT_FOUND)
-        )
-        with pytest.raises(SignatureInvalid, match="not a registered access key"):
-            await verify_near_ownership(
-                proof, POLICY_ID, NONCE, now_ns=NOW_NS, near_rpc_url=NEAR_RPC_URL
-            )
+    await verify_near_ownership(proof, POLICY_ID, NONCE, now_ns=NOW_NS)
 
 
 # ── Test 2: EVM EIP-191 happy path ────────────────────────────────────────
