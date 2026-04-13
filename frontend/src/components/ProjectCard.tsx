@@ -1,17 +1,6 @@
 import Link from "next/link";
 import StatusBadge from "./StatusBadge";
-
-type Status = "Upcoming" | "Open" | "Live" | "Closed";
-
-interface ProjectCardProps {
-  slug: string;
-  name: string;
-  ticker: string;
-  description: string;
-  status: Status;
-  meta: Record<string, string>;
-  audiences?: string[];
-}
+import type { ProjectMeta } from "@/types";
 
 export default function ProjectCard({
   slug,
@@ -21,7 +10,7 @@ export default function ProjectCard({
   status,
   meta,
   audiences,
-}: ProjectCardProps) {
+}: ProjectMeta) {
   const buttonLabel =
     status === "Upcoming"
       ? "Notify Me"
@@ -80,11 +69,11 @@ export default function ProjectCard({
         ))}
       </div>
 
-      <button
-        className={`mt-lg w-full rounded-lg py-2.5 text-sm font-medium transition-colors ${buttonStyle}`}
+      <span
+        className={`mt-lg block w-full rounded-lg py-2.5 text-center text-sm font-medium transition-colors ${buttonStyle}`}
       >
         {buttonLabel}
-      </button>
+      </span>
     </Link>
   );
 }

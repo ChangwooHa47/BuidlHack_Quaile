@@ -50,7 +50,7 @@ export default function ProjectDetailPage() {
             <span className="text-gray-800">{PROJECT.name}</span>
           </p>
 
-          <div className="flex gap-xl">
+          <div className="flex flex-col gap-xl lg:flex-row">
             {/* Left content */}
             <div className="flex-1">
               {/* Project header */}
@@ -59,7 +59,7 @@ export default function ProjectDetailPage() {
                   {PROJECT.ticker.charAt(0)}
                 </div>
                 <h1 className="text-2xl font-semibold text-gray-1000">{PROJECT.name}</h1>
-                <StatusBadge status={PROJECT.status === "Subscribing" ? "Open" : PROJECT.status as never} />
+                <StatusBadge status={PROJECT.status} />
               </div>
 
               <p className="mb-md text-sm leading-relaxed text-gray-700">
@@ -166,7 +166,7 @@ export default function ProjectDetailPage() {
             </div>
 
             {/* Right sidebar */}
-            <aside className="w-[340px] shrink-0">
+            <aside className="w-full shrink-0 lg:w-[340px]">
               <div className="sticky top-20 rounded-xl border border-border bg-surface p-lg">
                 {/* Mini card header */}
                 <div className="mb-lg flex items-center gap-sm">
