@@ -295,3 +295,50 @@ fn structured_rules_serde_roundtrip() {
     assert_eq!(rules.min_wallet_holding_days, restored.min_wallet_holding_days);
     assert_eq!(rules.qualitative_prompt, restored.qualitative_prompt);
 }
+
+// ── Test 8: payload_hash golden vector ────────────────────────────────────
+//
+// This constant pins the expected keccak256(borsh(dummy_payload())) output.
+// It serves as the cross-feature equivalence proof: the same 32-byte value
+// must be produced by:
+//   - std mode  : sha3::Keccak256 (this test)
+//   - contract mode: near_sdk::env::keccak256_array (wasm runtime; verified in test-02)
+//   - Python TEE    : eth_hash / pycryptodome keccak256 (golden-vector CI in test-02)
+//
+// If any of the three implementations diverges, at least one golden-vector
+// test will fail — making the divergence immediately visible.
+const GOLDEN_PAYLOAD_HASH: [u8; 32] = [
+    0x24, 0xed, 0x18, 0x27, 0x5f, 0xd4, 0xf4, 0xb4,
+    0xd9, 0xc2, 0x7b, 0xe3, 0x63, 0x3a, 0x3a, 0x24,
+    0x02, 0x7b, 0x7f, 0x3e, 0xdf, 0x03, 0x1a, 0x3d,
+    0x74, 0xe5, 0x58, 0x1e, 0x09, 0x5d, 0xbe, 0xb4,
+];
+
+#[test]
+fn payload_hash_std_golden_vector() {
+    // Verifies that the std (sha3 crate) keccak256 implementation produces the
+    // canonical golden hash for dummy_payload(). This same input/output pair is
+    // used in test-02 to assert std == contract == Python equivalence.
+    let computed = payload_hash(&dummy_payload());
+    assert_eq!(
+        computed, GOLDEN_PAYLOAD_HASH,
+        "payload_hash diverged from golden vector — \
+         either the Borsh layout or the keccak256 impl changed.\n\
+         hex: {}",
+        computed.iter().map(|b| format!("{:02x}", b)).collect::<String>(),
+    );
+}
+
+#[test]
+fn payload_hash_golden_hex_string() {
+    // Canonical hex form used as the cross-language reference value in test-02.
+    let hex: String = GOLDEN_PAYLOAD_HASH
+        .iter()
+        .map(|b| format!("{:02x}", b))
+        .collect();
+    assert_eq!(
+        hex,
+        "24ed18275fd4f4b4d9c27be3633a3a24027b7f3edf031a3d74e5581e095dbeb4",
+        "GOLDEN_PAYLOAD_HASH constant and its hex representation must agree",
+    );
+}

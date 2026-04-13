@@ -5,6 +5,43 @@ use crate::{
     AccountId,
 };
 
+/// Serde helper for `[u8; 64]`: serializes/deserializes as a length-64 byte tuple.
+/// Needed because serde's derive only handles arrays up to size 32 in this version.
+#[cfg(not(feature = "contract"))]
+mod serde_sig_rs {
+    use serde::{Deserializer, Serializer};
+
+    pub fn serialize<S: Serializer>(bytes: &[u8; 64], s: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeTuple;
+        let mut seq = s.serialize_tuple(64)?;
+        for b in bytes {
+            seq.serialize_element(b)?;
+        }
+        seq.end()
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<[u8; 64], D::Error> {
+        use serde::de::{Error, SeqAccess, Visitor};
+        struct V;
+        impl<'de> Visitor<'de> for V {
+            type Value = [u8; 64];
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                write!(f, "a tuple of 64 bytes")
+            }
+            fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+                let mut arr = [0u8; 64];
+                for (i, slot) in arr.iter_mut().enumerate() {
+                    *slot = seq
+                        .next_element()?
+                        .ok_or_else(|| A::Error::invalid_length(i, &self))?;
+                }
+                Ok(arr)
+            }
+        }
+        d.deserialize_tuple(64, V)
+    }
+}
+
 /// 32-byte random nonce. Must be unique per `(investor, policy_id)`.
 pub type Nonce = [u8; 32];
 
@@ -22,6 +59,7 @@ pub const RATIONALE_MAX_CHARS: usize = 280;
 ///
 /// Field order is **fixed** — any reorder breaks existing signatures.
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
+#[cfg_attr(not(feature = "contract"), derive(serde::Serialize, serde::Deserialize))]
 pub struct AttestationPayload {
     /// NEAR account ID of the investor being attested.
     pub subject: AccountId,
@@ -41,6 +79,7 @@ pub struct AttestationPayload {
 
 /// TEE adjudication result.
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(not(feature = "contract"), derive(serde::Serialize, serde::Deserialize))]
 pub enum Verdict {
     Eligible,
     Ineligible,
@@ -51,6 +90,7 @@ pub enum Verdict {
 /// Individual wallet addresses, transaction details, self_intro text, and
 /// GitHub identifiers are **never** included here.
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
+#[cfg_attr(not(feature = "contract"), derive(serde::Serialize, serde::Deserialize))]
 pub struct EvidenceSummary {
     pub wallet_count_near: u8,
     pub wallet_count_evm: u8,
@@ -78,11 +118,13 @@ pub struct EvidenceSummary {
 /// `ecrecover(payload_hash, signature_rs, signature_v)` → address
 /// must equal `signing_addresses[signing_key_id]`.
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
+#[cfg_attr(not(feature = "contract"), derive(serde::Serialize, serde::Deserialize))]
 pub struct AttestationBundle {
     pub payload: AttestationPayload,
     /// `keccak256(borsh_serialize(payload))` — verified by `attestation-verifier` contract.
     pub payload_hash: Hash32,
     /// secp256k1 ECDSA signature: r (bytes 0..32) ‖ s (bytes 32..64).
+    #[cfg_attr(not(feature = "contract"), serde(with = "serde_sig_rs"))]
     pub signature_rs: [u8; 64],
     /// Recovery id, normalised to 0 or 1 (never 27/28).
     pub signature_v: u8,
@@ -96,7 +138,7 @@ pub struct AttestationBundle {
 /// using its own Pydantic model; this Rust type exists for documentation and
 /// Rust-side test utilities only.
 #[cfg(not(feature = "contract"))]
-#[derive(Clone, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct AttestationBundleWithReport {
     pub bundle: AttestationBundle,
     /// Opaque blob: Intel TDX quote ‖ NVIDIA GPU attestation payload (JSON).
