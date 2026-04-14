@@ -55,7 +55,7 @@ async def test_happy_mock_rpc_parses_signal(httpx_mock, monkeypatch):
     httpx_mock.add_response(
         method="GET",
         url="https://explorer.example/1?module=account&action=txlist"
-        f"&address={ADDRESS}&startblock=0&page=1&offset=1&sort=asc&chainid=1",
+        f"&address={ADDRESS}&startblock=0&page=1&offset=1&sort=asc",
         json={
             "status": "1",
             "message": "OK",
@@ -66,7 +66,7 @@ async def test_happy_mock_rpc_parses_signal(httpx_mock, monkeypatch):
         httpx_mock.add_response(
             method="GET",
             url="https://explorer.example/1?module=account&action=tokenbalance"
-            f"&contractaddress={token}&address={ADDRESS}&tag=latest&chainid=1",
+            f"&contractaddress={token}&address={ADDRESS}&tag=latest",
             json={
                 "status": "1",
                 "message": "OK",
@@ -104,14 +104,14 @@ async def test_six_chains_collect_in_parallel(httpx_mock, monkeypatch):
         httpx_mock.add_response(
             method="GET",
             url=f"https://explorer.example/{cid}?module=account&action=txlist"
-            f"&address={ADDRESS}&startblock=0&page=1&offset=1&sort=asc&chainid={cid}",
+            f"&address={ADDRESS}&startblock=0&page=1&offset=1&sort=asc",
             json={"status": "1", "message": "OK", "result": [{"blockNumber": "100"}]},
         )
         for token in _tokens_for(cid):
             httpx_mock.add_response(
                 method="GET",
                 url=f"https://explorer.example/{cid}?module=account&action=tokenbalance"
-                f"&contractaddress={token}&address={ADDRESS}&tag=latest&chainid={cid}",
+                f"&contractaddress={token}&address={ADDRESS}&tag=latest",
                 json={"status": "1", "message": "OK", "result": "0"},
             )
 
@@ -158,14 +158,14 @@ async def test_rpc_500_retries_then_succeeds(httpx_mock, monkeypatch):
     httpx_mock.add_response(
         method="GET",
         url="https://explorer.example/1?module=account&action=txlist"
-        f"&address={ADDRESS}&startblock=0&page=1&offset=1&sort=asc&chainid=1",
+        f"&address={ADDRESS}&startblock=0&page=1&offset=1&sort=asc",
         json={"status": "1", "message": "OK", "result": [{"blockNumber": "100"}]},
     )
     for token in _ethereum_tokens():
         httpx_mock.add_response(
             method="GET",
             url="https://explorer.example/1?module=account&action=tokenbalance"
-            f"&contractaddress={token}&address={ADDRESS}&tag=latest&chainid=1",
+            f"&contractaddress={token}&address={ADDRESS}&tag=latest",
             json={"status": "1", "message": "OK", "result": "0"},
         )
 
@@ -194,14 +194,14 @@ async def test_one_chain_timeout_keeps_other_chain_success(httpx_mock, monkeypat
     httpx_mock.add_response(
         method="GET",
         url="https://explorer.example/1?module=account&action=txlist"
-        f"&address={ADDRESS}&startblock=0&page=1&offset=1&sort=asc&chainid=1",
+        f"&address={ADDRESS}&startblock=0&page=1&offset=1&sort=asc",
         json={"status": "1", "message": "OK", "result": [{"blockNumber": "100"}]},
     )
     for token in _ethereum_tokens():
         httpx_mock.add_response(
             method="GET",
             url="https://explorer.example/1?module=account&action=tokenbalance"
-            f"&contractaddress={token}&address={ADDRESS}&tag=latest&chainid=1",
+            f"&contractaddress={token}&address={ADDRESS}&tag=latest",
             json={"status": "1", "message": "OK", "result": "0"},
         )
 
@@ -229,14 +229,14 @@ async def test_ens_lookup_failure_does_not_drop_signal(httpx_mock, monkeypatch):
     httpx_mock.add_response(
         method="GET",
         url="https://explorer.example/1?module=account&action=txlist"
-        f"&address={ADDRESS}&startblock=0&page=1&offset=1&sort=asc&chainid=1",
+        f"&address={ADDRESS}&startblock=0&page=1&offset=1&sort=asc",
         json={"status": "1", "message": "OK", "result": []},
     )
     for token in _ethereum_tokens():
         httpx_mock.add_response(
             method="GET",
             url="https://explorer.example/1?module=account&action=tokenbalance"
-            f"&contractaddress={token}&address={ADDRESS}&tag=latest&chainid=1",
+            f"&contractaddress={token}&address={ADDRESS}&tag=latest",
             json={"status": "1", "message": "OK", "result": "0"},
         )
 

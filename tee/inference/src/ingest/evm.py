@@ -192,7 +192,6 @@ class EvmIngestor:
         if config.explorer_api is None:
             raise ExplorerApiFailure("missing explorer api")
         params = dict(params)
-        params["chainid"] = str(config.chain_id)
         if config.etherscan_api_key_env:
             api_key = os.getenv(config.etherscan_api_key_env)
             if api_key:
