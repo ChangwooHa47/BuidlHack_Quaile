@@ -173,7 +173,8 @@ class NearIngestor:
             return 0, 0, total_txs
 
         txn = txns[0]
-        first_seen_block = int(txn.get("block_height") or 0)
+        block = txn.get("block") if isinstance(txn.get("block"), dict) else {}
+        first_seen_block = int(txn.get("block_height") or block.get("block_height") or 0)
         timestamp_ns = _to_ns(
             txn.get("block_timestamp") or txn.get("block_time") or txn.get("created_at")
         )
@@ -186,12 +187,22 @@ class NearIngestor:
         url = f"{NEARBLOCKS_API}/account/{account_id}/tokens"
         try:
             resp = await self._request("GET", url)
-            raw_tokens: list[NearBlocksToken] = resp.json().get("tokens", [])
+            raw_tokens = resp.json().get("tokens", [])
         except Exception:
             return []
 
         holdings: list[FtHoldingModel] = []
+        if isinstance(raw_tokens, dict):
+            raw_tokens = raw_tokens.get("fts", [])
+
         for item in raw_tokens:
+            if isinstance(item, str):
+                holdings.append(
+                    FtHoldingModel(token=item, balance=0, first_acquired=0)
+                )
+                continue
+            if not isinstance(item, dict):
+                continue
             token = (
                 item.get("contract")
                 or item.get("contract_id")

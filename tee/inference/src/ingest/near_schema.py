@@ -50,6 +50,7 @@ class CallFunctionResult(TypedDict, total=False):
 
 class NearBlocksTxn(TypedDict, total=False):
     block_height: int
+    block: dict[str, int]
     block_timestamp: int | str
     block_time: int | str
     created_at: int | str
