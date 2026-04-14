@@ -6,7 +6,7 @@ const PROJECT = {
   name: "Momentum",
   ticker: "MMT",
   chains: ["BNB", "SUI"],
-  status: "Subscribing" as const,
+  phase: "Subscribing" as const,
   description:
     "The leading concentrated liquidity DEX on Sui, delivering top APRs for liquidity providers. Powered by the ve(3,3) model.",
   totalRaised: "$81,190,980",
@@ -59,7 +59,7 @@ export default function ProjectDetailPage() {
                   {PROJECT.ticker.charAt(0)}
                 </div>
                 <h1 className="text-2xl font-semibold text-gray-1000">{PROJECT.name}</h1>
-                <StatusBadge status={PROJECT.status} />
+                <StatusBadge phase={PROJECT.phase} />
               </div>
 
               <p className="mb-md text-sm leading-relaxed text-gray-700">
@@ -88,16 +88,15 @@ export default function ProjectDetailPage() {
 
               {/* Status section */}
               <section className="mb-xl">
-                <h2 className="mb-md text-base font-semibold text-gray-1000">Status</h2>
                 <StatusStepper
                   currentStep={PROJECT.currentStep}
                   dates={{
-                    0: { label: "23 Jul", sub: "Completed" },
-                    1: { label: "30 Jul", sub: "Completed" },
-                    2: { label: "06 Oct", sub: "09 Oct UTC" },
-                    3: { label: "Nov 2025" },
-                    4: { label: "Nov 2025" },
-                    5: { label: "Dec 2025" },
+                    0: { line1: "25 Oct", line2: "02:00 UTC" },
+                    1: { line1: "26 Oct", line2: "10:00 UTC" },
+                    2: { line1: "28 Oct", line2: "11:00 UTC" },
+                    3: { line1: "Nov 2025" },
+                    4: { line1: "Nov 2025" },
+                    5: { line1: "Dec 2025" },
                   }}
                 />
               </section>
@@ -174,7 +173,7 @@ export default function ProjectDetailPage() {
                     M
                   </div>
                   <span className="text-sm font-medium text-gray-1000">{PROJECT.name}</span>
-                  <StatusBadge status="Open" />
+                  <StatusBadge phase={PROJECT.phase} />
                 </div>
 
                 {/* Identity */}

@@ -8,68 +8,83 @@ const STEPS = [
   "End",
 ] as const;
 
+interface StepDate {
+  line1: string;
+  line2?: string;
+}
+
 interface StatusStepperProps {
   currentStep: number;
-  dates?: Record<number, { label: string; sub?: string }>;
+  dates?: Record<number, StepDate>;
 }
 
 export default function StatusStepper({ currentStep, dates }: StatusStepperProps) {
   return (
     <div className="w-full">
-      <div className="flex items-center">
+      {/* Title */}
+      <h2 className="mb-lg text-2xl font-medium text-gray-1000">Status</h2>
+
+      {/* Stepper */}
+      <div className="relative flex items-start">
+        {/* Background connector line */}
+        <div className="absolute left-4 right-4 top-4 h-0.5 rounded-full bg-alpha-20" />
+
+        {/* Active connector line */}
+        {currentStep > 0 && (
+          <div
+            className="absolute left-4 top-4 h-0.5 rounded-full bg-neon-glow"
+            style={{
+              width: `${((currentStep) / (STEPS.length - 1)) * 100}%`,
+              maxWidth: "calc(100% - 32px)",
+            }}
+          />
+        )}
+
+        {/* Steps */}
         {STEPS.map((step, i) => {
           const isCompleted = i < currentStep;
           const isCurrent = i === currentStep;
+          const isUpcoming = i > currentStep;
+
           return (
-            <div key={step} className="flex flex-1 flex-col items-center">
-              <div className="flex w-full items-center">
-                {i > 0 && (
-                  <div
-                    className={`h-0.5 flex-1 ${
-                      isCompleted ? "bg-neon-glow" : "bg-gray-400"
-                    }`}
-                  />
+            <div key={step} className="relative z-10 flex flex-1 flex-col items-center">
+              {/* Circle */}
+              <div
+                className={`flex h-8 w-8 items-center justify-center rounded-full ${
+                  isCompleted
+                    ? "bg-neon-glow"
+                    : isCurrent
+                      ? "border-2 border-neon-glow bg-background"
+                      : "bg-[#1a1a1a]"
+                }`}
+              >
+                {isCompleted && (
+                  <span className="text-sm font-medium text-gray-0">✓</span>
                 )}
-                <div
-                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
-                    isCompleted
-                      ? "border-neon-glow bg-neon-glow"
-                      : isCurrent
-                        ? "border-neon-glow bg-background"
-                        : "border-gray-500 bg-background"
-                  }`}
-                >
-                  {isCompleted && (
-                    <svg className="h-3 w-3 text-gray-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                  {isCurrent && (
-                    <div className="h-2 w-2 rounded-full bg-neon-glow" />
-                  )}
-                </div>
-                {i < STEPS.length - 1 && (
-                  <div
-                    className={`h-0.5 flex-1 ${
-                      isCompleted ? "bg-neon-glow" : "bg-gray-400"
-                    }`}
-                  />
+                {isCurrent && (
+                  <div className="h-2.5 w-2.5 rounded-full bg-neon-glow" />
                 )}
               </div>
+
+              {/* Label */}
               <span
-                className={`mt-xs text-xs ${
-                  isCompleted || isCurrent ? "text-gray-900" : "text-gray-600"
+                className={`mt-xs text-sm font-medium ${
+                  isUpcoming ? "text-alpha-40" : "text-gray-1000"
                 }`}
               >
                 {step}
               </span>
-              {dates?.[i] && (
+
+              {/* Date */}
+              {dates?.[i] ? (
                 <div className="mt-0.5 text-center">
-                  <span className="text-[10px] text-gray-600">{dates[i].label}</span>
-                  {dates[i].sub && (
-                    <span className="block text-[10px] text-gray-600">{dates[i].sub}</span>
+                  <span className="text-[11px] text-alpha-40">{dates[i].line1}</span>
+                  {dates[i].line2 && (
+                    <span className="block text-[11px] text-alpha-40">{dates[i].line2}</span>
                   )}
                 </div>
+              ) : (
+                <span className="mt-0.5 text-[11px] text-alpha-40">—</span>
               )}
             </div>
           );

@@ -3,12 +3,12 @@
 import StatusBadge from "./StatusBadge";
 import { useWallet } from "@/contexts/WalletContext";
 import { useIdentity } from "@/contexts/IdentityContext";
-import type { ProjectStatus } from "@/types";
+import type { Phase } from "@/types";
 
 interface SubscribingSidebarProps {
   name: string;
   ticker: string;
-  status: ProjectStatus;
+  status: Phase;
 }
 
 export default function SubscribingSidebar({ name, ticker, status }: SubscribingSidebarProps) {
@@ -22,7 +22,7 @@ export default function SubscribingSidebar({ name, ticker, status }: Subscribing
           {ticker.charAt(0)}
         </div>
         <span className="text-sm font-medium text-gray-1000">{name}</span>
-        <StatusBadge status={status} />
+        <StatusBadge phase={status} />
       </div>
 
       <div className="mb-lg">

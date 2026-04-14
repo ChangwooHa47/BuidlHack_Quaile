@@ -1,19 +1,18 @@
-import type { ProjectStatus } from "@/types";
+import type { Phase } from "@/types";
 
-const statusConfig: Record<ProjectStatus, { dot: string; text: string; bg: string }> = {
-  Upcoming: { dot: "bg-status-upcoming", text: "text-status-upcoming", bg: "bg-status-upcoming/10" },
-  Subscribing: { dot: "bg-neon-glow", text: "text-neon-glow", bg: "bg-neon-glow/10" },
-  Open: { dot: "bg-neon-glow", text: "text-neon-glow", bg: "bg-neon-glow/10" },
-  Live: { dot: "bg-status-refund", text: "text-status-refund", bg: "bg-status-refund/10" },
-  Closed: { dot: "bg-gray-600", text: "text-gray-700", bg: "bg-alpha-8" },
+const phaseConfig: Record<Phase, { dot: string; text: string; glow: string }> = {
+  Upcoming: { dot: "bg-status-upcoming", text: "text-status-upcoming", glow: "shadow-[0_0_16px_rgba(107,163,255,0.6)]" },
+  Subscribing: { dot: "bg-neon-glow", text: "text-neon-glow", glow: "shadow-[0_0_16px_rgba(200,255,0,0.6)]" },
+  Live: { dot: "bg-[#ff4d6d]", text: "text-[#ff4d6d]", glow: "shadow-[0_0_16px_rgba(255,77,109,0.6)]" },
+  Closed: { dot: "bg-gray-600", text: "text-gray-700", glow: "" },
 };
 
-export default function StatusBadge({ status }: { status: ProjectStatus }) {
-  const config = statusConfig[status];
+export default function StatusBadge({ phase }: { phase: Phase }) {
+  const config = phaseConfig[phase];
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-pill px-2.5 py-1 text-xs font-medium ${config.bg} ${config.text}`}>
-      <span className={`h-1.5 w-1.5 rounded-full ${config.dot}`} />
-      {status}
+    <span className="inline-flex items-center gap-1.5 rounded-pill border border-alpha-12 bg-gray-150 px-2.5 py-[5px]">
+      <span className={`h-1.5 w-1.5 rounded-full ${config.dot} ${config.glow}`} />
+      <span className={`text-xs font-medium ${config.text}`}>{phase}</span>
     </span>
   );
 }
