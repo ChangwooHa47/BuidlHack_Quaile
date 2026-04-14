@@ -32,6 +32,43 @@ export default function EvaluationCriteriaPage() {
   const [internalCriteria, setInternalCriteria] = useState(DEFAULT_INTERNAL);
   const [externalCriteria] = useState(DEFAULT_EXTERNAL);
 
+  // SaleConfig state
+  const [tokenContract, setTokenContract] = useState("momentum.testnet");
+  const [totalAllocation, setTotalAllocation] = useState("10000000");
+  const [pricePerToken, setPricePerToken] = useState("0.001");
+  const [subscriptionStart, setSubscriptionStart] = useState("");
+  const [subscriptionEnd, setSubscriptionEnd] = useState("");
+  const [liveEnd, setLiveEnd] = useState("");
+  const [isPublishing, setIsPublishing] = useState(false);
+
+  async function handlePublish() {
+    // Build natural_language from criteria
+    const enabledInternal = internalCriteria.filter((c) => c.enabled);
+    const naturalLanguage = [
+      "Internal Criteria:",
+      ...enabledInternal.map((c) => `- ${c.name} (${c.weight}%): ${c.condition}`),
+      "",
+      "External Criteria:",
+      ...externalCriteria.map((c) => `- ${c.name} (${c.weight}%): ${c.condition}`),
+    ].join("\n");
+
+    // Validate
+    if (naturalLanguage.length < 20) return alert("Criteria too short");
+    if (!subscriptionStart || !subscriptionEnd || !liveEnd) return alert("Fill all dates");
+    const start = new Date(subscriptionStart).getTime();
+    const end = new Date(subscriptionEnd).getTime();
+    const live = new Date(liveEnd).getTime();
+    if (start <= Date.now()) return alert("Subscription start must be in the future");
+    if (end <= start + 3600000) return alert("Subscription end must be >1hr after start");
+    if (live <= end) return alert("Live end must be after subscription end");
+
+    setIsPublishing(true);
+    // Mock: register_policy contract call
+    await new Promise((r) => setTimeout(r, 2000));
+    setIsPublishing(false);
+    alert(`Mock: register_policy called\n\nnatural_language (${naturalLanguage.length} chars):\n${naturalLanguage.slice(0, 200)}...\n\nSaleConfig:\ntoken=${tokenContract}\nallocation=${totalAllocation}\nprice=${pricePerToken}\nstart=${subscriptionStart}\nend=${subscriptionEnd}\nlive_end=${liveEnd}`);
+  }
+
   function toggleCriterion(id: string) {
     setInternalCriteria((prev) =>
       prev.map((c) => (c.id === id ? { ...c, enabled: !c.enabled } : c)),
@@ -171,17 +208,59 @@ export default function EvaluationCriteriaPage() {
         </div>
       </div>
 
+      {/* Sale Configuration */}
+      <div className="mx-auto max-w-[1440px] px-[80px] pb-[56px]">
+        <h2 className="text-[24px] font-medium text-gray-1000">Sale Configuration</h2>
+        <p className="mt-2 text-sm text-alpha-40">Define the token sale parameters for your IDO.</p>
+
+        <div className="mt-lg grid grid-cols-3 gap-md">
+          <SaleField label="Token Contract" value={tokenContract} onChange={setTokenContract} placeholder="token.testnet" />
+          <SaleField label="Total Allocation" value={totalAllocation} onChange={setTotalAllocation} placeholder="10000000" suffix="tokens" />
+          <SaleField label="Price per Token" value={pricePerToken} onChange={setPricePerToken} placeholder="0.001" suffix="NEAR" />
+          <SaleField label="Subscription Start" value={subscriptionStart} onChange={setSubscriptionStart} type="datetime-local" />
+          <SaleField label="Subscription End" value={subscriptionEnd} onChange={setSubscriptionEnd} type="datetime-local" />
+          <SaleField label="Live End" value={liveEnd} onChange={setLiveEnd} type="datetime-local" />
+        </div>
+        <p className="mt-sm text-xs text-alpha-40">Payment token: <span className="text-gray-1000">NEAR</span> (MVP)</p>
+      </div>
+
       {/* Actions: sticky */}
       <div className="sticky bottom-0 border-t border-alpha-12 bg-gray-50/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-[1440px] items-center justify-end gap-[12px] px-[80px] py-[24px] pb-[56px]">
           <button className="rounded-xl bg-gray-200 px-[28px] py-[16px] text-base font-medium text-alpha-60 transition-colors hover:bg-alpha-8">
             Save Draft
           </button>
-          <button className="rounded-xl bg-neon-glow px-[28px] py-[16px] text-base font-medium text-gray-0 transition-colors hover:bg-neon-soft">
-            Publish Criteria
+          <button
+            onClick={handlePublish}
+            disabled={isPublishing}
+            className="rounded-xl bg-neon-glow px-[28px] py-[16px] text-base font-medium text-gray-0 transition-colors hover:bg-neon-soft disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {isPublishing ? "Publishing..." : "Publish Criteria"}
           </button>
         </div>
       </div>
     </main>
+  );
+}
+
+function SaleField({
+  label, value, onChange, placeholder, type = "text", suffix,
+}: {
+  label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string; suffix?: string;
+}) {
+  return (
+    <div>
+      <label className="mb-xs block text-xs font-medium text-alpha-40">{label}</label>
+      <div className="relative">
+        <input
+          type={type}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="w-full rounded-[10px] border border-alpha-12 bg-gray-150 px-md py-sm text-sm text-gray-1000 placeholder:text-alpha-20 focus:border-neon-glow/40 focus:outline-none"
+        />
+        {suffix && <span className="absolute right-md top-1/2 -translate-y-1/2 text-xs text-alpha-40">{suffix}</span>}
+      </div>
+    </div>
   );
 }

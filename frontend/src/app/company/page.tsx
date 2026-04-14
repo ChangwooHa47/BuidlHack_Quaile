@@ -123,6 +123,70 @@ export default function CompanyDashboard() {
             </div>
           </section>
 
+          {/* Settlement Results */}
+          <section className="rounded-[14px] border border-alpha-12 bg-gray-200 p-lg">
+            <h3 className="text-base font-medium text-gray-1000">Settlement Results</h3>
+            <div className="mt-md grid grid-cols-3 gap-md">
+              <MiniStat label="Total Demand" value="$81,190,980" />
+              <MiniStat label="Total Matched" value="$4,500,000" />
+              <MiniStat label="Match Ratio" value="5.5%" highlight />
+            </div>
+            <div className="mt-md">
+              <div className="flex items-center justify-between text-xs text-alpha-40">
+                <span>Demand</span>
+                <span>Supply (Target)</span>
+              </div>
+              <div className="relative mt-1 h-3 w-full overflow-hidden rounded-full bg-alpha-12">
+                <div className="absolute inset-y-0 left-0 rounded-full bg-neon-glow/20" style={{ width: "100%" }} />
+                <div className="absolute inset-y-0 left-0 rounded-full bg-neon-glow" style={{ width: "5.5%" }} />
+              </div>
+              <p className="mt-1 text-right text-xs text-neon-glow">✓ Settlement Complete</p>
+            </div>
+          </section>
+
+          {/* Detailed Contributions Table */}
+          <section className="rounded-[14px] border border-alpha-12 bg-gray-200 p-lg">
+            <h3 className="text-base font-medium text-gray-1000">All Contributions</h3>
+            <div className="mt-md overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-alpha-12 text-left text-[11px] font-medium uppercase tracking-wider text-alpha-40">
+                    <th className="pb-sm">Investor</th>
+                    <th className="pb-sm">Amount</th>
+                    <th className="pb-sm">Outcome</th>
+                    <th className="pb-sm">Matched</th>
+                    <th className="pb-sm">Tokens</th>
+                    <th className="pb-sm">Claim</th>
+                    <th className="pb-sm">Refund</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-alpha-12">
+                  {[
+                    { investor: "alice.testnet", amount: "$500,000", outcome: "FullMatch" as const, matched: "$500,000", tokens: "250,000", claim: true, refund: false },
+                    { investor: "bob.testnet", amount: "$1,200,000", outcome: "PartialMatch" as const, matched: "$800,000", tokens: "400,000", claim: false, refund: false },
+                    { investor: "carol.testnet", amount: "$340,000", outcome: "NoMatch" as const, matched: "$0", tokens: "0", claim: false, refund: true },
+                    { investor: "dave.testnet", amount: "$800,000", outcome: "FullMatch" as const, matched: "$800,000", tokens: "400,000", claim: true, refund: false },
+                    { investor: "eve.testnet", amount: "$2,100,000", outcome: "PartialMatch" as const, matched: "$1,400,000", tokens: "700,000", claim: false, refund: false },
+                  ].map((c) => (
+                    <tr key={c.investor}>
+                      <td className="py-sm text-gray-1000">{c.investor}</td>
+                      <td className="py-sm text-gray-1000">{c.amount}</td>
+                      <td className="py-sm">
+                        <span className={`text-xs font-medium ${c.outcome === "FullMatch" ? "text-neon-glow" : c.outcome === "PartialMatch" ? "text-status-subscribing" : "text-status-refund"}`}>
+                          {c.outcome}
+                        </span>
+                      </td>
+                      <td className="py-sm text-gray-1000">{c.matched}</td>
+                      <td className="py-sm text-gray-1000">{c.tokens}</td>
+                      <td className="py-sm">{c.claim ? <span className="text-xs text-neon-glow">✓</span> : <span className="text-xs text-alpha-40">—</span>}</td>
+                      <td className="py-sm">{c.refund ? <span className="text-xs text-neon-glow">✓</span> : <span className="text-xs text-alpha-40">—</span>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
           {/* Project Details (collapsible) */}
           <details className="group">
             <summary className="flex cursor-pointer list-none items-center gap-2 text-[20px] font-medium text-gray-1000">
@@ -181,6 +245,15 @@ function KpiCard({ label, value, sub, highlight }: { label: string; value: strin
       <p className="text-xs text-alpha-40">{label}</p>
       <p className={`mt-xs text-[28px] font-semibold ${highlight ? "text-neon-glow" : "text-gray-1000"}`}>{value}</p>
       {sub && <p className="mt-1 text-xs text-alpha-40">{sub}</p>}
+    </div>
+  );
+}
+
+function MiniStat({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+  return (
+    <div className="rounded-xl border border-alpha-12 bg-gray-150 p-md">
+      <p className="text-xs text-alpha-40">{label}</p>
+      <p className={`mt-xs text-lg font-semibold ${highlight ? "text-neon-glow" : "text-gray-1000"}`}>{value}</p>
     </div>
   );
 }
