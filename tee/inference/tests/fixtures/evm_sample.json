@@ -1,0 +1,8 @@
+{
+  "address": "0xd8da6bf26964af9d7eed9e03e53415d37aa96045",
+  "native_balance": 123456789,
+  "tx_count": 42,
+  "first_seen_block": 100,
+  "block_timestamp": 1700000000,
+  "erc20_balance": 5000
+}
