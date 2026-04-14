@@ -14,7 +14,7 @@ from schemas import EvmWalletProofModel
 
 FIXTURES = Path(__file__).parent / "fixtures"
 ADDRESS = "0xd8da6bf26964af9d7eed9e03e53415d37aa96045"
-SUPPORTED_CHAIN_IDS = [1, 8453, 42161, 10, 137, 56]
+SUPPORTED_CHAIN_IDS = [1, 42161, 137]
 
 
 def _proof(chain_id: int = 1, address: str = ADDRESS) -> EvmWalletProofModel:
@@ -55,7 +55,7 @@ async def test_happy_mock_rpc_parses_signal(httpx_mock, monkeypatch):
     httpx_mock.add_response(
         method="GET",
         url="https://explorer.example/1?module=account&action=txlist"
-        f"&address={ADDRESS}&startblock=0&page=1&offset=1&sort=asc",
+        f"&address={ADDRESS}&startblock=0&page=1&offset=1&sort=asc&chainid=1",
         json={
             "status": "1",
             "message": "OK",
@@ -66,7 +66,7 @@ async def test_happy_mock_rpc_parses_signal(httpx_mock, monkeypatch):
         httpx_mock.add_response(
             method="GET",
             url="https://explorer.example/1?module=account&action=tokenbalance"
-            f"&contractaddress={token}&address={ADDRESS}&tag=latest",
+            f"&contractaddress={token}&address={ADDRESS}&tag=latest&chainid=1",
             json={
                 "status": "1",
                 "message": "OK",
@@ -87,11 +87,11 @@ async def test_happy_mock_rpc_parses_signal(httpx_mock, monkeypatch):
     assert signal.holding_days == 10
     assert signal.erc20s[0].balance_wei == sample["erc20_balance"].to_bytes(32, "big")
 
-    await ingestor.http.aclose()
+    await ingestor.aclose()
 
 
 @pytest.mark.asyncio
-async def test_six_chains_collect_in_parallel(httpx_mock, monkeypatch):
+async def test_supported_chains_collect_in_parallel(httpx_mock, monkeypatch):
     monkeypatch.setattr("ingest.evm.asyncio.sleep", _no_sleep)
     monkeypatch.setattr("ingest.evm.time.time_ns", lambda: 1700864000000000000)
     ingestor = EvmIngestor(_chains(SUPPORTED_CHAIN_IDS))
@@ -104,14 +104,14 @@ async def test_six_chains_collect_in_parallel(httpx_mock, monkeypatch):
         httpx_mock.add_response(
             method="GET",
             url=f"https://explorer.example/{cid}?module=account&action=txlist"
-            f"&address={ADDRESS}&startblock=0&page=1&offset=1&sort=asc",
+            f"&address={ADDRESS}&startblock=0&page=1&offset=1&sort=asc&chainid={cid}",
             json={"status": "1", "message": "OK", "result": [{"blockNumber": "100"}]},
         )
         for token in _tokens_for(cid):
             httpx_mock.add_response(
                 method="GET",
                 url=f"https://explorer.example/{cid}?module=account&action=tokenbalance"
-                f"&contractaddress={token}&address={ADDRESS}&tag=latest",
+                f"&contractaddress={token}&address={ADDRESS}&tag=latest&chainid={cid}",
                 json={"status": "1", "message": "OK", "result": "0"},
             )
 
@@ -122,11 +122,11 @@ async def test_six_chains_collect_in_parallel(httpx_mock, monkeypatch):
     elapsed = time.perf_counter() - started
 
     assert errors == []
-    assert len(signals) == 6
+    assert len(signals) == 3
     assert {signal.chain_id for signal in signals} == set(SUPPORTED_CHAIN_IDS)
     assert elapsed < 0.9
 
-    await ingestor.http.aclose()
+    await ingestor.aclose()
 
 
 @pytest.mark.asyncio
@@ -140,7 +140,7 @@ async def test_unsupported_chain_raises_and_collect_reports_error():
     assert signals == []
     assert errors == [f"999:{ADDRESS}: UnsupportedChain"]
 
-    await ingestor.http.aclose()
+    await ingestor.aclose()
 
 
 @pytest.mark.asyncio
@@ -158,14 +158,14 @@ async def test_rpc_500_retries_then_succeeds(httpx_mock, monkeypatch):
     httpx_mock.add_response(
         method="GET",
         url="https://explorer.example/1?module=account&action=txlist"
-        f"&address={ADDRESS}&startblock=0&page=1&offset=1&sort=asc",
+        f"&address={ADDRESS}&startblock=0&page=1&offset=1&sort=asc&chainid=1",
         json={"status": "1", "message": "OK", "result": [{"blockNumber": "100"}]},
     )
     for token in _ethereum_tokens():
         httpx_mock.add_response(
             method="GET",
             url="https://explorer.example/1?module=account&action=tokenbalance"
-            f"&contractaddress={token}&address={ADDRESS}&tag=latest",
+            f"&contractaddress={token}&address={ADDRESS}&tag=latest&chainid=1",
             json={"status": "1", "message": "OK", "result": "0"},
         )
 
@@ -175,7 +175,7 @@ async def test_rpc_500_retries_then_succeeds(httpx_mock, monkeypatch):
     assert len(signals) == 1
     assert ingestor.clients[1].eth.balance_calls == 2
 
-    await ingestor.http.aclose()
+    await ingestor.aclose()
 
 
 @pytest.mark.asyncio
@@ -194,14 +194,14 @@ async def test_one_chain_timeout_keeps_other_chain_success(httpx_mock, monkeypat
     httpx_mock.add_response(
         method="GET",
         url="https://explorer.example/1?module=account&action=txlist"
-        f"&address={ADDRESS}&startblock=0&page=1&offset=1&sort=asc",
+        f"&address={ADDRESS}&startblock=0&page=1&offset=1&sort=asc&chainid=1",
         json={"status": "1", "message": "OK", "result": [{"blockNumber": "100"}]},
     )
     for token in _ethereum_tokens():
         httpx_mock.add_response(
             method="GET",
             url="https://explorer.example/1?module=account&action=tokenbalance"
-            f"&contractaddress={token}&address={ADDRESS}&tag=latest",
+            f"&contractaddress={token}&address={ADDRESS}&tag=latest&chainid=1",
             json={"status": "1", "message": "OK", "result": "0"},
         )
 
@@ -211,7 +211,7 @@ async def test_one_chain_timeout_keeps_other_chain_success(httpx_mock, monkeypat
     assert signals[0].chain_id == 1
     assert errors == [f"42161:{ADDRESS}: RpcFailure"]
 
-    await ingestor.http.aclose()
+    await ingestor.aclose()
 
 
 @pytest.mark.asyncio
@@ -229,14 +229,14 @@ async def test_ens_lookup_failure_does_not_drop_signal(httpx_mock, monkeypatch):
     httpx_mock.add_response(
         method="GET",
         url="https://explorer.example/1?module=account&action=txlist"
-        f"&address={ADDRESS}&startblock=0&page=1&offset=1&sort=asc",
+        f"&address={ADDRESS}&startblock=0&page=1&offset=1&sort=asc&chainid=1",
         json={"status": "1", "message": "OK", "result": []},
     )
     for token in _ethereum_tokens():
         httpx_mock.add_response(
             method="GET",
             url="https://explorer.example/1?module=account&action=tokenbalance"
-            f"&contractaddress={token}&address={ADDRESS}&tag=latest",
+            f"&contractaddress={token}&address={ADDRESS}&tag=latest&chainid=1",
             json={"status": "1", "message": "OK", "result": "0"},
         )
 
@@ -247,7 +247,7 @@ async def test_ens_lookup_failure_does_not_drop_signal(httpx_mock, monkeypatch):
     assert signals[0].native_balance_wei == (0).to_bytes(32, "big")
     assert signals[0].holding_days == 0
 
-    await ingestor.http.aclose()
+    await ingestor.aclose()
 
 
 @pytest.mark.skipif(
@@ -267,10 +267,10 @@ async def test_vitalik_multichain_integration():
             [_proof(cid) for cid in SUPPORTED_CHAIN_IDS]
         )
     finally:
-        await ingestor.http.aclose()
+        await ingestor.aclose()
 
     assert errors == []
-    assert len(signals) == 6
+    assert len(signals) == 3
     assert {signal.chain_id for signal in signals} == set(SUPPORTED_CHAIN_IDS)
 
 
@@ -350,15 +350,19 @@ def _tokens_for(chain_id: int) -> tuple[str, ...]:
 
 def _missing_integration_envs() -> list[str]:
     missing: list[str] = []
+    seen: set[str] = set()
     for cid in SUPPORTED_CHAIN_IDS:
         config = SUPPORTED_CHAINS[cid]
         if not config.rpc:
             rpc_env = f"RPC_{config.name.upper()}"
             if config.name == "ethereum":
                 rpc_env = "RPC_ETHEREUM"
-            missing.append(rpc_env)
+            if rpc_env not in seen:
+                missing.append(rpc_env)
+                seen.add(rpc_env)
         if config.etherscan_api_key_env and not os.environ.get(
             config.etherscan_api_key_env
-        ):
+        ) and config.etherscan_api_key_env not in seen:
             missing.append(config.etherscan_api_key_env)
+            seen.add(config.etherscan_api_key_env)
     return missing

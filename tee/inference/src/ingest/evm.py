@@ -23,29 +23,16 @@ ERC20_WHITELIST: dict[int, tuple[str, ...]] = {
         "0x6b175474e89094c44da98b954eedeac495271d0f",
         "0x514910771af9ca656af840dff83e8264ecf986ca",
     ),
-    8453: (
-        "0x833589fcd6edb6e08f4c7c32d4f71b54bdA02913".lower(),
-        "0x4200000000000000000000000000000000000006",
-    ),
     42161: (
         "0xaf88d065e77c8cc2239327c5edb3a432268e5831",
         "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9",
         "0x82af49447d8a07e3bd95bd0d56f35241523fbab1",
-    ),
-    10: (
-        "0x0b2c639c533813f4aa9d7837caf62653d097ff85",
-        "0x4200000000000000000000000000000000000006",
     ),
     137: (
         "0x2791bca1f2de4661ed88a30c99a7a9449aa84174",
         "0xc2132d05d31c914a87c6611c10748aeb04b58e8f",
         "0x7ceb23fd6bc0add59e62ac25578270cff1b9f619",
         "0x8f3cf7ad23cd3cadbd9735aff958023239c6a063",
-    ),
-    56: (
-        "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d",
-        "0x55d398326f99059ff775485246999027b3197955",
-        "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c",
     ),
 }
 
@@ -81,6 +68,15 @@ class EvmIngestor:
         }
         self.http = httpx.AsyncClient(timeout=10.0)
         self._chain_sems = {cid: asyncio.Semaphore(3) for cid in chains}
+        self._explorer_sem = asyncio.Semaphore(1)
+
+    async def aclose(self) -> None:
+        await self.http.aclose()
+        for client in self.clients.values():
+            provider = getattr(client, "provider", None)
+            disconnect = getattr(provider, "disconnect", None)
+            if disconnect is not None:
+                await disconnect()
 
     async def collect(
         self, proofs: list[EvmWalletProofModel]
@@ -192,6 +188,7 @@ class EvmIngestor:
         if config.explorer_api is None:
             raise ExplorerApiFailure("missing explorer api")
         params = dict(params)
+        params["chainid"] = str(config.chain_id)
         if config.etherscan_api_key_env:
             api_key = os.getenv(config.etherscan_api_key_env)
             if api_key:
@@ -200,7 +197,8 @@ class EvmIngestor:
         last_error: Exception | None = None
         for attempt in range(len(RETRY_DELAYS) + 1):
             try:
-                resp = await self.http.get(config.explorer_api, params=params)
+                async with self._explorer_sem:
+                    resp = await self.http.get(config.explorer_api, params=params)
                 if resp.status_code == 429:
                     raise RateLimited("explorer rate limited")
                 resp.raise_for_status()
