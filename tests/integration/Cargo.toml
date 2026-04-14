@@ -1,0 +1,20 @@
+[package]
+name = "integration-tests"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+
+# NOTE: This crate is excluded from the main workspace because
+# near-workspaces pulls in near-gas 0.3.5 which requires Rust 1.82+ (edition2024).
+# Run with: cd tests/integration && cargo test
+# After upgrading Rust: uncomment "tests/integration" in root Cargo.toml members.
+
+[dependencies]
+near-workspaces = "0.14"
+near-gas = "0.2"
+tokio = { version = "1", features = ["full"] }
+serde_json = "1"
+near-sdk = { version = "=5.3.0", features = ["unstable", "legacy"] }
+tee-shared = { path = "../../tee/shared", default-features = false, features = ["contract"] }
+anyhow = "1"
