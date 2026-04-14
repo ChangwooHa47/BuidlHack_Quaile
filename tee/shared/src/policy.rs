@@ -15,7 +15,8 @@ pub type PolicyId = u64;
 /// - `subscription_start < subscription_end < live_end`
 /// - `sale_config.total_allocation > 0`, `price_per_token > 0`
 /// - `foundation`, `sale_config.token_contract`, `sale_config.total_allocation` are immutable after creation.
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "contract", borsh(crate = "near_sdk::borsh"))]
 pub struct Policy {
     pub id: PolicyId,
     pub foundation: AccountId,
@@ -33,7 +34,8 @@ pub struct Policy {
 /// NOTE: The sub-statuses used in the UI (Subscription / Review / Contribution /
 /// Settlement / Refund / Claim) are **off-chain labels only**. The contract stores
 /// only these four variants.
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "contract", borsh(crate = "near_sdk::borsh"))]
 pub enum PolicyStatus {
     Upcoming,
     Subscribing,
@@ -44,7 +46,8 @@ pub enum PolicyStatus {
 /// Sale parameters — immutable once the policy is created.
 ///
 /// `live_start` is not a separate field: `live_start := subscription_end`.
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "contract", borsh(crate = "near_sdk::borsh"))]
 pub struct SaleConfig {
     pub token_contract: AccountId,
     /// Total IDO token allocation in token-smallest-units.
@@ -62,7 +65,8 @@ pub struct SaleConfig {
 }
 
 /// Payment denomination accepted by this IDO.
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "contract", borsh(crate = "near_sdk::borsh"))]
 pub enum PaymentToken {
     /// Native NEAR token (yoctoNEAR).
     Near,
