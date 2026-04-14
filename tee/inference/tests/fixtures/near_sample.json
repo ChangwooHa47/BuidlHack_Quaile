@@ -1,0 +1,50 @@
+{
+  "account_id": "near",
+  "view_account": {
+    "jsonrpc": "2.0",
+    "id": "buidl-near-ai",
+    "result": {
+      "amount": "1230000000000000000000000",
+      "locked": "0",
+      "storage_usage": 1000,
+      "block_height": 1000,
+      "block_hash": "block"
+    }
+  },
+  "txns_only": {
+    "txns": [
+      {
+        "block_height": 10,
+        "block_timestamp": 1700000000000000000
+      }
+    ],
+    "total": 7
+  },
+  "access_key_list": {
+    "jsonrpc": "2.0",
+    "id": "buidl-near-ai",
+    "result": {
+      "keys": [],
+      "block_height": 1000,
+      "block_hash": "block"
+    }
+  },
+  "tokens": {
+    "tokens": [
+      {
+        "contract_id": "token.near",
+        "balance": "42",
+        "first_acquired": 1700000000000000000
+      }
+    ]
+  },
+  "dao": [
+    {
+      "id": 3,
+      "votes": {
+        "near": "Approve"
+      },
+      "submission_time": 1700000000000000000
+    }
+  ]
+}
