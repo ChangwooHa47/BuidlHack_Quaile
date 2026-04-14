@@ -9,14 +9,17 @@ export default function CompanyHeader() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-alpha-12 bg-background/80 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-[1200px] items-center justify-between px-lg">
+      <div className="mx-auto flex h-16 max-w-[1440px] items-center justify-between px-[80px]">
         <Link href="/company" className="text-xl font-semibold tracking-tight text-gray-1000">
           Qualie.
         </Link>
 
         <nav className="flex items-center gap-xl">
           <Link href="/company" className="text-sm font-medium text-gray-1000 transition-colors hover:text-alpha-60">
-            Dashboard
+            Project
+          </Link>
+          <Link href="/company/criteria" className="text-sm font-medium text-alpha-40 transition-colors hover:text-alpha-60">
+            Criteria
           </Link>
         </nav>
 
