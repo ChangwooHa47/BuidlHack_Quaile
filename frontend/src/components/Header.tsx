@@ -1,0 +1,41 @@
+"use client";
+
+import Link from "next/link";
+import { useWallet } from "@/contexts/WalletContext";
+import ConnectedWallet from "./ConnectedWallet";
+
+export default function Header() {
+  const { accountId, isConnected, isLoading, signIn, signOut } = useWallet();
+
+  return (
+    <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-md">
+      <div className="mx-auto flex h-16 max-w-[1200px] items-center justify-between px-lg">
+        <Link href="/" className="text-xl font-semibold tracking-tight text-gray-1000">
+          Qualie.
+        </Link>
+
+        <nav className="flex items-center gap-xl">
+          <Link href="/" className="text-sm font-medium text-gray-800 hover:text-gray-1000 transition-colors">
+            Project
+          </Link>
+          <Link href="/profile" className="text-sm font-medium text-gray-700 hover:text-gray-1000 transition-colors">
+            Profile
+          </Link>
+        </nav>
+
+        {isLoading ? (
+          <div className="h-9 w-32 animate-pulse rounded-pill bg-gray-400" />
+        ) : isConnected && accountId ? (
+          <ConnectedWallet address={accountId} onDisconnect={signOut} />
+        ) : (
+          <button
+            onClick={signIn}
+            className="rounded-pill border border-gray-500 px-md py-xs text-sm font-medium text-gray-1000 hover:bg-alpha-8 transition-colors"
+          >
+            Connect Wallet
+          </button>
+        )}
+      </div>
+    </header>
+  );
+}

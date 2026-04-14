@@ -1,0 +1,81 @@
+@import "tailwindcss";
+
+@theme inline {
+  /* Gray Scale */
+  --color-gray-0: #000000;
+  --color-gray-50: #0a0a0a;
+  --color-gray-100: #111111;
+  --color-gray-150: #161616;
+  --color-gray-200: #1c1c1c;
+  --color-gray-300: #242424;
+  --color-gray-400: #2e2e2e;
+  --color-gray-500: #3d3d3d;
+  --color-gray-600: #555555;
+  --color-gray-700: #7a7a7a;
+  --color-gray-800: #a3a3a3;
+  --color-gray-900: #cfcfcf;
+  --color-gray-950: #ededed;
+  --color-gray-1000: #ffffff;
+
+  /* Alpha White */
+  --color-alpha-4: rgba(255, 255, 255, 0.04);
+  --color-alpha-8: rgba(255, 255, 255, 0.08);
+  --color-alpha-12: rgba(255, 255, 255, 0.12);
+  --color-alpha-20: rgba(255, 255, 255, 0.20);
+  --color-alpha-40: rgba(255, 255, 255, 0.40);
+  --color-alpha-60: rgba(255, 255, 255, 0.60);
+  --color-alpha-80: rgba(255, 255, 255, 0.80);
+
+  /* Neon Accent */
+  --color-neon-glow: #c8ff00;
+  --color-neon-soft: #e5ff66;
+  --color-neon-dim: #6b8000;
+  --color-neon-muted: rgba(200, 255, 0, 0.25);
+
+  /* Status Colors */
+  --color-status-upcoming: #6ba3ff;
+  --color-status-subscribing: #b4c864;
+  --color-status-live: #c8ff00;
+  --color-status-closed: #7a7a7a;
+  --color-status-review: #a3a3a3;
+  --color-status-settlement: #b2a629;
+  --color-status-refund: #ff3b6b;
+
+  /* Background / Foreground */
+  --color-background: #0a0a0a;
+  --color-foreground: #ededed;
+  --color-surface: #111111;
+  --color-surface-raised: #161616;
+  --color-border: rgba(255, 255, 255, 0.12);
+
+  /* Font */
+  --font-sans: var(--font-dm-sans), system-ui, sans-serif;
+
+  /* Spacing */
+  --spacing-2xs: 4px;
+  --spacing-xs: 8px;
+  --spacing-sm: 12px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-2xl: 48px;
+  --spacing-3xl: 64px;
+
+  /* Radius */
+  --radius-none: 0px;
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 24px;
+  --radius-pill: 9999px;
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
