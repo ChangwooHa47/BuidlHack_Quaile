@@ -56,15 +56,6 @@ cd tee/inference && uv sync && uv run pytest
 - `eth_keys.PrivateKey.sign_msg_hash` 사용 (eth_account.signHash 금지 — EIP-191 prefix 적용됨)
 - `eth_hash.auto.keccak` 사용 (pysha3 금지 — Python 3.11+ 빌드 실패)
 
-## Environment Variables (frontend/.env.local)
-
-```
-NEXT_PUBLIC_POLICY_REGISTRY=policy.buidlnear.testnet
-NEXT_PUBLIC_ATTESTATION_VERIFIER=verifier.buidlnear.testnet
-NEXT_PUBLIC_IDO_ESCROW=escrow.buidlnear.testnet
-NEXT_PUBLIC_TEE_API_URL=http://localhost:8080
-```
-
 ## Key References
 
 - 기획: `planning/PRD.md`, `planning/ERD.md`
