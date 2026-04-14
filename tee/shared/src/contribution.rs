@@ -10,7 +10,8 @@ use crate::{
 ///
 /// Stored on-chain in `ido-escrow`.
 /// `(investor, policy_id)` is the compound primary key — duplicates are rejected.
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "contract", borsh(crate = "near_sdk::borsh"))]
 pub struct Contribution {
     pub investor: AccountId,
     pub policy_id: PolicyId,
@@ -44,7 +45,8 @@ pub struct Contribution {
 /// | FullMatch      | ✓       | ✗                 |
 /// | PartialMatch   | ✓       | ✓ (independently) |
 /// | NoMatch        | ✗       | ✓                 |
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "contract", borsh(crate = "near_sdk::borsh"))]
 pub enum ContributionOutcome {
     /// Before `settle()` is called.
     NotSettled,

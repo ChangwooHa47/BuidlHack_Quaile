@@ -1,0 +1,15 @@
+[package]
+name = "attestation-verifier"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+near-sdk = { workspace = true }
+tee-shared = { path = "../../tee/shared", default-features = false, features = ["contract"] }
+
+[dev-dependencies]
+near-sdk = { workspace = true, features = ["unit-testing"] }

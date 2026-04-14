@@ -7,7 +7,6 @@ use crate::{
 
 /// Serde helper for `[u8; 64]`: serializes/deserializes as a length-64 byte tuple.
 /// Needed because serde's derive only handles arrays up to size 32 in this version.
-#[cfg(not(feature = "contract"))]
 mod serde_sig_rs {
     use serde::{Deserializer, Serializer};
 
@@ -58,8 +57,8 @@ pub const RATIONALE_MAX_CHARS: usize = 280;
 /// Python must replicate this exact layout for golden-vector tests (test-02).
 ///
 /// Field order is **fixed** — any reorder breaks existing signatures.
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
-#[cfg_attr(not(feature = "contract"), derive(serde::Serialize, serde::Deserialize))]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "contract", borsh(crate = "near_sdk::borsh"))]
 pub struct AttestationPayload {
     /// NEAR account ID of the investor being attested.
     pub subject: AccountId,
@@ -78,8 +77,8 @@ pub struct AttestationPayload {
 }
 
 /// TEE adjudication result.
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(not(feature = "contract"), derive(serde::Serialize, serde::Deserialize))]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "contract", borsh(crate = "near_sdk::borsh"))]
 pub enum Verdict {
     Eligible,
     Ineligible,
@@ -89,8 +88,8 @@ pub enum Verdict {
 ///
 /// Individual wallet addresses, transaction details, self_intro text, and
 /// GitHub identifiers are **never** included here.
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
-#[cfg_attr(not(feature = "contract"), derive(serde::Serialize, serde::Deserialize))]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "contract", borsh(crate = "near_sdk::borsh"))]
 pub struct EvidenceSummary {
     pub wallet_count_near: u8,
     pub wallet_count_evm: u8,
@@ -117,14 +116,14 @@ pub struct EvidenceSummary {
 /// # Verification
 /// `ecrecover(payload_hash, signature_rs, signature_v)` → address
 /// must equal `signing_addresses[signing_key_id]`.
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
-#[cfg_attr(not(feature = "contract"), derive(serde::Serialize, serde::Deserialize))]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "contract", borsh(crate = "near_sdk::borsh"))]
 pub struct AttestationBundle {
     pub payload: AttestationPayload,
     /// `keccak256(borsh_serialize(payload))` — verified by `attestation-verifier` contract.
     pub payload_hash: Hash32,
     /// secp256k1 ECDSA signature: r (bytes 0..32) ‖ s (bytes 32..64).
-    #[cfg_attr(not(feature = "contract"), serde(with = "serde_sig_rs"))]
+    #[serde(with = "serde_sig_rs")]
     pub signature_rs: [u8; 64],
     /// Recovery id, normalised to 0 or 1 (never 27/28).
     pub signature_v: u8,
