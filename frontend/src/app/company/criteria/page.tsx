@@ -44,12 +44,10 @@ export default function EvaluationCriteriaPage() {
   async function handlePublish() {
     // Build natural_language from criteria
     const enabledInternal = internalCriteria.filter((c) => c.enabled);
+    const enabledExternal = externalCriteria.filter((c) => c.enabled);
     const naturalLanguage = [
-      "Internal Criteria:",
-      ...enabledInternal.map((c) => `- ${c.name} (${c.weight}%): ${c.condition}`),
-      "",
-      "External Criteria:",
-      ...externalCriteria.map((c) => `- ${c.name} (${c.weight}%): ${c.condition}`),
+      ...(enabledInternal.length ? ["Internal Criteria:", ...enabledInternal.map((c) => `- ${c.name} (${c.weight}%): ${c.condition}`), ""] : []),
+      ...(enabledExternal.length ? ["External Criteria:", ...enabledExternal.map((c) => `- ${c.name} (${c.weight}%): ${c.condition}`)] : []),
     ].join("\n");
 
     // Validate

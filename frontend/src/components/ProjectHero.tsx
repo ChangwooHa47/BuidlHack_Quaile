@@ -14,13 +14,13 @@ export default function ProjectHero({ name, ticker, phase, description, chains, 
   const dotColor: Record<Phase, string> = {
     Upcoming: "bg-status-upcoming shadow-[0_0_16px_rgba(107,163,255,0.6)]",
     Subscribing: "bg-neon-glow shadow-[0_0_16px_rgba(200,255,0,0.6)]",
-    Live: "bg-[#ff4d6d] shadow-[0_0_16px_rgba(255,77,109,0.6)]",
+    Live: "bg-status-refund shadow-[0_0_16px_rgba(255,77,109,0.6)]",
     Closed: "bg-gray-600",
   };
   const textColor: Record<Phase, string> = {
     Upcoming: "text-status-upcoming",
     Subscribing: "text-neon-glow",
-    Live: "text-[#ff4d6d]",
+    Live: "text-status-refund",
     Closed: "text-gray-700",
   };
 
