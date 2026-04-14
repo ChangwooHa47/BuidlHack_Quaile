@@ -14,6 +14,7 @@ from schemas import EvmWalletProofModel
 
 FIXTURES = Path(__file__).parent / "fixtures"
 ADDRESS = "0xd8da6bf26964af9d7eed9e03e53415d37aa96045"
+SUPPORTED_CHAIN_IDS = [1, 8453, 42161, 10, 137, 56]
 
 
 def _proof(chain_id: int = 1, address: str = ADDRESS) -> EvmWalletProofModel:
@@ -93,9 +94,8 @@ async def test_happy_mock_rpc_parses_signal(httpx_mock, monkeypatch):
 async def test_six_chains_collect_in_parallel(httpx_mock, monkeypatch):
     monkeypatch.setattr("ingest.evm.asyncio.sleep", _no_sleep)
     monkeypatch.setattr("ingest.evm.time.time_ns", lambda: 1700864000000000000)
-    chain_ids = [1, 8453, 42161, 10, 137, 56]
-    ingestor = EvmIngestor(_chains(chain_ids))
-    for cid in chain_ids:
+    ingestor = EvmIngestor(_chains(SUPPORTED_CHAIN_IDS))
+    for cid in SUPPORTED_CHAIN_IDS:
         ingestor.clients[cid] = FakeWeb3(
             balance=cid,
             tx_count=cid,
@@ -116,11 +116,14 @@ async def test_six_chains_collect_in_parallel(httpx_mock, monkeypatch):
             )
 
     started = time.perf_counter()
-    signals, errors = await ingestor.collect([_proof(cid) for cid in chain_ids])
+    signals, errors = await ingestor.collect(
+        [_proof(cid) for cid in SUPPORTED_CHAIN_IDS]
+    )
     elapsed = time.perf_counter() - started
 
     assert errors == []
     assert len(signals) == 6
+    assert {signal.chain_id for signal in signals} == set(SUPPORTED_CHAIN_IDS)
     assert elapsed < 0.9
 
     await ingestor.http.aclose()
@@ -249,20 +252,26 @@ async def test_ens_lookup_failure_does_not_drop_signal(httpx_mock, monkeypatch):
 
 @pytest.mark.skipif(
     not bool(os.environ.get("EVM_INTEGRATION_TEST")),
-    reason="set EVM_INTEGRATION_TEST=1 to run ethereum integration",
+    reason="set EVM_INTEGRATION_TEST=1 to run EVM multichain integration",
 )
 @pytest.mark.asyncio
-async def test_vitalik_ethereum_integration():
-    assert os.environ.get("RPC_ETHEREUM"), "RPC_ETHEREUM is required"
-    assert os.environ.get("ETHERSCAN_API_KEY"), "ETHERSCAN_API_KEY is required"
+async def test_vitalik_multichain_integration():
+    missing_envs = _missing_integration_envs()
+    assert missing_envs == [], f"missing integration envs: {', '.join(missing_envs)}"
 
-    ingestor = EvmIngestor({1: SUPPORTED_CHAINS[1]})
+    ingestor = EvmIngestor(
+        {cid: SUPPORTED_CHAINS[cid] for cid in SUPPORTED_CHAIN_IDS}
+    )
     try:
-        signal = await ingestor._collect_one(_proof())
+        signals, errors = await ingestor.collect(
+            [_proof(cid) for cid in SUPPORTED_CHAIN_IDS]
+        )
     finally:
         await ingestor.http.aclose()
 
-    assert signal.chain_id == 1
+    assert errors == []
+    assert len(signals) == 6
+    assert {signal.chain_id for signal in signals} == set(SUPPORTED_CHAIN_IDS)
 
 
 class FakeWeb3:
@@ -337,3 +346,19 @@ def _tokens_for(chain_id: int) -> tuple[str, ...]:
     from ingest.evm import ERC20_WHITELIST
 
     return ERC20_WHITELIST[chain_id]
+
+
+def _missing_integration_envs() -> list[str]:
+    missing: list[str] = []
+    for cid in SUPPORTED_CHAIN_IDS:
+        config = SUPPORTED_CHAINS[cid]
+        if not config.rpc:
+            rpc_env = f"RPC_{config.name.upper()}"
+            if config.name == "ethereum":
+                rpc_env = "RPC_ETHEREUM"
+            missing.append(rpc_env)
+        if config.etherscan_api_key_env and not os.environ.get(
+            config.etherscan_api_key_env
+        ):
+            missing.append(config.etherscan_api_key_env)
+    return missing
