@@ -1,99 +1,73 @@
-# Buidl-NEAR AI (Qualie)
+# Project: Qualie (Buidl-NEAR AI)
 
-## 프로젝트 개요
-TEE 기반 AI Attestation IDO 런치패드. 재단이 투자자 선별 기준을 자연어로 등록하고, TEE 안의 AI가 투자자의 페르소나를 심사하여 서명된 Attestation을 발급.
+TEE 기반 AI Attestation IDO 런치패드. 모노레포.
 
-## 브랜치 전략
-```
-main        ← 개발 통합 (feature 브랜치 머지 대상)
-staging     ← QA / 테스트 배포 (main에서 머지)
-production  ← 프로덕션 배포 (staging 검증 후 머지)
-```
+## Build & Run
 
-- feature 브랜치: `feat/{description}-#{issue}` (예: `feat/fe-publishing-#2`)
-- 1이슈 = 1브랜치 = 1PR
-- force push 금지, 브랜치 삭제 금지 (머지 후 자동 정리)
-
-## 모노레포 구조
-```
-NEARAI/
-├── frontend/          # Next.js 16 + Tailwind v4 + TypeScript
-├── contracts/         # Rust NEAR 스마트 컨트랙트 (다른 팀 담당)
-├── tee/               # TEE 추론 서비스 Python (다른 팀 담당)
-├── planning/          # PRD, ERD, 태스크, 리서치
-└── scripts/           # 배포/테스트 스크립트
-```
-
-## Frontend (frontend/)
-
-### 기술 스택
-- Next.js 16.2.3 (App Router)
-- Tailwind CSS v4 (`@theme inline` 토큰)
-- TypeScript (strict)
-- DM Sans (Google Fonts)
-
-### 실행
 ```bash
-cd frontend
-npm install
-npm run dev        # http://localhost:3000
-npm run build      # 프로덕션 빌드
+# Frontend
+cd frontend && npm install && npm run dev
+
+# Rust (contracts + shared crate)
+cargo build --workspace
+cargo build --target wasm32-unknown-unknown --release
+
+# TEE Python
+cd tee/inference && uv sync && uv run pytest
 ```
 
-### 환경변수 (frontend/.env.local)
-```bash
+## Monorepo Layout
+
+- `frontend/` — Next.js 16 + Tailwind v4 + TypeScript
+- `contracts/` — Rust NEAR 스마트 컨트랙트
+- `tee/shared/` — Rust shared crate (컨트랙트 + TEE 공용 타입)
+- `tee/inference/` — Python FastAPI TEE 서비스
+- `planning/` — PRD, ERD, 태스크 문서 (코드 아님)
+
+## Branch Strategy
+
+- `main` — 개발 통합. feature 브랜치 머지 대상
+- `staging` — QA 배포 (Vercel Preview)
+- `production` — 프로덕션 배포 (Vercel Production)
+- feature: `feat/{description}-#{issue}`
+- 1이슈 = 1브랜치 = 1PR. force push 금지
+
+## Coding Rules
+
+### Frontend
+- Server Component 기본. `"use client"`는 상태/이벤트 필요할 때만
+- 디자인 토큰은 `globals.css`의 `@theme inline` 사용. 하드코딩 색상/간격 금지
+- Phase(4개): Upcoming / Subscribing / Live / Closed — 필터, chip용
+- Status(8개): Phase 내 세부 상태 — CTA, 사이드바용
+- `phaseOf(status)` 헬퍼로 Status→Phase 변환
+
+### 프라이버시 (FE 전체 하드 룰)
+- ❌ 개별 지갑 주소 렌더링 금지
+- ❌ self_intro 원문 표시 금지
+- ❌ GitHub login/email 표시 금지
+- ✅ evidence_summary 집계 필드만 표시 (wallet_count, avg_holding_days 등)
+
+### Rust
+- `tee/shared` crate가 타입 SSOT. 컨트랙트와 TEE가 동일 타입 공유
+- Borsh 직렬화. payload_hash = keccak256(borsh(payload))
+- 서명: secp256k1 ECDSA (env::ecrecover)
+
+### Python (TEE)
+- `eth_keys.PrivateKey.sign_msg_hash` 사용 (eth_account.signHash 금지 — EIP-191 prefix 적용됨)
+- `eth_hash.auto.keccak` 사용 (pysha3 금지 — Python 3.11+ 빌드 실패)
+
+## Environment Variables (frontend/.env.local)
+
+```
 NEXT_PUBLIC_POLICY_REGISTRY=policy.buidlnear.testnet
 NEXT_PUBLIC_ATTESTATION_VERIFIER=verifier.buidlnear.testnet
 NEXT_PUBLIC_IDO_ESCROW=escrow.buidlnear.testnet
 NEXT_PUBLIC_TEE_API_URL=http://localhost:8080
 ```
-환경변수 없어도 기본값(testnet)으로 동작.
 
-### 배포
-- **플랫폼**: Vercel 권장
-- **staging**: `staging` 브랜치 push 시 자동 배포 (Vercel Preview)
-- **production**: `production` 브랜치 push 시 자동 배포 (Vercel Production)
-- **Vercel 설정**:
-  - Root Directory: `frontend`
-  - Framework Preset: Next.js
-  - Build Command: `npm run build`
-  - Output Directory: `.next`
-  - Environment Variables: 위 `.env.local` 항목을 Vercel 대시보드에 등록
+## Key References
 
-### 디자인 시스템
-- Figma: `2jqTgg2yRVflKmWR2huonu`
-- 토큰: `frontend/src/app/globals.css`의 `@theme inline` 블록
-- 컬러: Gray scale (0~1000), Alpha white, Neon accent (#C8FF00), Status colors
-- 타이포: DM Sans (400/500/600/700)
-- 간격: 2xs~3xl (4~64px)
-- Radius: xs~pill
-
-### Phase × Status 모델
-```
-Phase (온체인 4개, 필터/chip):  Upcoming → Subscribing → Live → Closed
-Status (세부 8개, CTA/사이드바):
-  Upcoming:     Upcoming
-  Subscribing:  Subscription → Review → Contribution
-  Live:         Settlement → Refund → Claim
-  Closed:       Closed
-```
-
-### 프라이버시 제약 (FE 전체 적용)
-- ❌ 개별 지갑 주소 렌더링 금지
-- ❌ self_intro 원문 표시 금지
-- ❌ GitHub login/email 표시 금지
-- ✅ evidence_summary 집계 필드만 표시
-
-## BE (contracts/ + tee/)
-다른 팀이 담당. 상세는 `planning/PRD.md`, `planning/ERD.md` 참조.
-
-### NEAR 컨트랙트 (testnet)
-- `policy-registry` — 재단 Policy 등록
-- `attestation-verifier` — TEE 서명 검증 (secp256k1 ecrecover)
-- `ido-escrow` — IDO 에스크로 (contribute/settle/claim/refund)
-- `mock-ft` — 데모용 NEP-141 토큰
-
-### TEE 서비스
-- Python FastAPI, NEAR AI Cloud TEE
-- secp256k1 ECDSA 서명
-- 상세: `planning/research/near-ai-tee-notes.md`
+- 기획: `planning/PRD.md`, `planning/ERD.md`
+- 디자인: Figma `2jqTgg2yRVflKmWR2huonu`
+- TEE 리서치: `planning/research/near-ai-tee-notes.md`
+- NEAR testnet. 서명 알고리즘 secp256k1.
