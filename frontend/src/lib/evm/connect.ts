@@ -1,55 +1,77 @@
 import { BrowserProvider } from "ethers";
-import { getWeb3Modal } from "./web3modal";
+
+export type WalletType = "metamask" | "walletconnect" | "coinbase";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let activeProvider: any = null;
 
 /**
- * Get the EVM provider — from Web3Modal if connected, otherwise window.ethereum.
+ * Connect via MetaMask (window.ethereum).
  */
-function getProvider(): BrowserProvider {
-  const modal = getWeb3Modal();
-  const walletProvider = modal?.getWalletProvider?.();
-  if (walletProvider) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return new BrowserProvider(walletProvider as any);
-  }
-  if (typeof window !== "undefined" && window.ethereum) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return new BrowserProvider(window.ethereum as any);
-  }
-  throw new Error("No EVM wallet found. Install MetaMask or use WalletConnect.");
-}
-
-export async function connectEvmWallet(): Promise<string> {
-  // Open Web3Modal to let user choose wallet
-  const modal = getWeb3Modal();
-  if (modal) {
-    await modal.open();
-    // Wait for connection
-    await new Promise<void>((resolve) => {
-      const check = setInterval(() => {
-        if (modal.getWalletProvider?.()) {
-          clearInterval(check);
-          resolve();
-        }
-      }, 500);
-      // Timeout after 60s
-      setTimeout(() => { clearInterval(check); resolve(); }, 60000);
-    });
-  }
-
-  const provider = getProvider();
+async function connectMetaMask(): Promise<{ address: string; chainId: number }> {
+  if (!window.ethereum) throw new Error("MetaMask not installed");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  activeProvider = window.ethereum as any;
+  const provider = new BrowserProvider(activeProvider);
   const accounts = await provider.send("eth_requestAccounts", []);
-  if (!accounts[0]) throw new Error("No account returned");
-  return (accounts[0] as string).toLowerCase();
-}
-
-export async function getEvmChainId(): Promise<number> {
-  const provider = getProvider();
+  if (!accounts[0]) throw new Error("No account");
   const network = await provider.getNetwork();
-  return Number(network.chainId);
+  return { address: (accounts[0] as string).toLowerCase(), chainId: Number(network.chainId) };
 }
 
+/**
+ * Connect via WalletConnect QR.
+ */
+async function connectWalletConnect(): Promise<{ address: string; chainId: number }> {
+  const { EthereumProvider } = await import("@walletconnect/ethereum-provider");
+  const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "PLACEHOLDER";
+  const wc = await EthereumProvider.init({
+    projectId,
+    chains: [1],
+    optionalChains: [8453, 42161, 10, 137, 56],
+    showQrModal: true,
+  });
+  await wc.connect();
+  activeProvider = wc;
+  const provider = new BrowserProvider(wc);
+  const signer = await provider.getSigner();
+  const address = (await signer.getAddress()).toLowerCase();
+  const network = await provider.getNetwork();
+  return { address, chainId: Number(network.chainId) };
+}
+
+/**
+ * Connect via Coinbase Wallet.
+ */
+async function connectCoinbase(): Promise<{ address: string; chainId: number }> {
+  const { CoinbaseWalletSDK } = await import("@coinbase/wallet-sdk");
+  const sdk = new CoinbaseWalletSDK({ appName: "Qualie" });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  activeProvider = (sdk as any).makeWeb3Provider?.() ?? sdk;
+  const provider = new BrowserProvider(activeProvider);
+  const accounts = await provider.send("eth_requestAccounts", []);
+  if (!accounts[0]) throw new Error("No account");
+  const network = await provider.getNetwork();
+  return { address: (accounts[0] as string).toLowerCase(), chainId: Number(network.chainId) };
+}
+
+/**
+ * Connect an EVM wallet by type.
+ */
+export async function connectEvmWallet(type: WalletType): Promise<{ address: string; chainId: number }> {
+  switch (type) {
+    case "metamask": return connectMetaMask();
+    case "walletconnect": return connectWalletConnect();
+    case "coinbase": return connectCoinbase();
+  }
+}
+
+/**
+ * Sign a message with the currently active provider.
+ */
 export async function signEvmMessage(message: string): Promise<string> {
-  const provider = getProvider();
+  if (!activeProvider) throw new Error("No wallet connected");
+  const provider = new BrowserProvider(activeProvider);
   const signer = await provider.getSigner();
   return signer.signMessage(message);
 }

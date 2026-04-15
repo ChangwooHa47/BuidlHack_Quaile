@@ -16,7 +16,7 @@ function policyToProject(policy: OnChainPolicy, subscribers: number, pendingTota
   const progress = totalAlloc > 0 ? Math.round((totalPending / totalAlloc) * 100) : 0;
 
   return {
-    slug: `policy-${policy.id}`,
+    slug: policy.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+$/, ""),
     name: policy.name,
     ticker: policy.ticker,
     chain: policy.chain,
