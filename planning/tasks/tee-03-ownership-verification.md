@@ -1,6 +1,6 @@
 ---
 id: tee-03-ownership-verification
-status: todo
+status: done
 sub: TEE
 layer: tee
 depends_on: [tee-01-persona-schema]

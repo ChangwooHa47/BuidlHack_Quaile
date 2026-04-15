@@ -1,6 +1,7 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::{
+    criteria::CriteriaResults,
     policy::{PolicyId, Timestamp},
     AccountId,
 };
@@ -47,10 +48,6 @@ pub type Nonce = [u8; 32];
 /// 32-byte hash (keccak256 output).
 pub type Hash32 = [u8; 32];
 
-/// Maximum characters allowed in `EvidenceSummary.rationale`.
-/// Enforced by the TEE before signing (tee-04 PII filter).
-pub const RATIONALE_MAX_CHARS: usize = 280;
-
 /// The payload that the TEE signs after evaluating an investor's Persona.
 ///
 /// Borsh-serialized and keccak256-hashed to produce `AttestationBundle.payload_hash`.
@@ -64,15 +61,14 @@ pub struct AttestationPayload {
     pub subject: AccountId,
     pub policy_id: PolicyId,
     pub verdict: Verdict,
-    /// Score in basis points: 0 = 0 %, 10000 = 100 %.
-    pub score: u16,
     pub issued_at: Timestamp,
     /// Validity end; normally `policy.sale_config.subscription_end`.
     pub expires_at: Timestamp,
     /// Carried through from `Persona.nonce` — prevents replay.
     pub nonce: Nonce,
-    pub evidence_summary: EvidenceSummary,
-    /// Payload schema version for future-proofing. Current value: 1.
+    /// Per-criterion pass/fail results fed into ZK circuit.
+    pub criteria_results: CriteriaResults,
+    /// Payload schema version for future-proofing. Current value: 2.
     pub payload_version: u8,
 }
 
@@ -82,24 +78,6 @@ pub struct AttestationPayload {
 pub enum Verdict {
     Eligible,
     Ineligible,
-}
-
-/// Privacy-safe evidence visible to foundations (no PII).
-///
-/// Individual wallet addresses, transaction details, self_intro text, and
-/// GitHub identifiers are **never** included here.
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "contract", borsh(crate = "near_sdk::borsh"))]
-pub struct EvidenceSummary {
-    pub wallet_count_near: u8,
-    pub wallet_count_evm: u8,
-    pub avg_holding_days: u32,
-    pub total_dao_votes: u32,
-    /// True if a GitHub OAuth token was provided and GitHub data was collected.
-    pub github_included: bool,
-    /// LLM-generated human-readable rationale.
-    /// Must be ≤ `RATIONALE_MAX_CHARS` characters and pass PII filter before signing.
-    pub rationale: String,
 }
 
 /// The on-chain attestation struct passed to `ido-escrow.contribute()`.

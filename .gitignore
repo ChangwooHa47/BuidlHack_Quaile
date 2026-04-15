@@ -30,6 +30,9 @@ tee/inference/out/
 # Node
 node_modules/
 
+# Circuits (ZK)
+circuits/build/
+
 # Misc
 planning/.tmp/
 scripts/e2e/out/

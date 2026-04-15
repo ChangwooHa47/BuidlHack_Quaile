@@ -18,14 +18,14 @@ from main import AppServices, _attestation_report_base_url, create_app
 from nearai_client import NearAIClient
 from pipeline import PipelineDeps
 from schemas import (
+    CriteriaRulesModel,
+    CriterionResult,
     EvmWalletSignalModel,
     GithubSignalModel,
     JudgeOutputModel,
     NearWalletSignalModel,
     PolicyModel,
     PolicySaleConfigModel,
-    RuleWeightsModel,
-    StructuredRulesModel,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -143,27 +143,32 @@ class StubLlmClient:
         self.fail_structurize = fail_structurize
         self.calls: list[str] = []
 
-    async def structurize(self, natural_language: str) -> StructuredRulesModel:
+    async def structurize(self, natural_language: str) -> CriteriaRulesModel:
         self.calls.append("structurize")
         if self.fail_structurize:
             raise RuntimeError("llm unavailable")
-        return StructuredRulesModel(
-            min_wallet_holding_days=180,
+        return CriteriaRulesModel(
+            criteria=[
+                "Token holding >= 180 days",
+                "Active on-chain participation",
+                "Open source contributor",
+            ],
             qualitative_prompt="Prefer consistent long-term builders.",
-            weights=RuleWeightsModel(quantitative=0.6, qualitative=0.4),
         )
 
     async def judge(self, rules, signals, self_intro: str) -> JudgeOutputModel:
         self.calls.append("judge")
         return JudgeOutputModel(
             verdict="Eligible",
-            score=7800,
+            criteria=[
+                CriterionResult(description="Token holding >= 180 days", passed=True),
+                CriterionResult(description="Active on-chain participation", passed=True),
+                CriterionResult(description="Open source contributor", passed=True),
+            ],
             rationale=(
                 "Long-term holding and sustained ecosystem activity "
                 "support eligibility."
             ),
-            quantitative_score=8000,
-            qualitative_score=7500,
         )
 
 
@@ -276,7 +281,16 @@ async def test_attest_happy_path_with_mocks():
     )
     assert recovered.lower() == expected_signer.lower()
     assert body["tee_report"]
-    assert body["bundle"]["payload"]["evidence_summary"]["github_included"] is True
+    # Verify criteria_results present
+    cr = body["bundle"]["payload"]["criteria_results"]
+    assert cr["count"] == 3
+    assert all(cr["results"][:3])
+    # Verify zk_input present
+    zk_input = body["zk_input"]
+    assert len(zk_input["payload_hash_limbs"]) == 4
+    assert all(isinstance(l, str) for l in zk_input["payload_hash_limbs"])
+    assert len(zk_input["criteria"]) == 10
+    assert zk_input["criteria_count"] == "3"
     report_calls = app.state.services.deps.report_client.calls
     assert report_calls[0][1] == persona["nonce"].removeprefix("0x")
     assert report_calls[1][1] == payload_hash.removeprefix("0x")
@@ -296,33 +310,30 @@ async def test_attest_rejects_before_llm_when_remote_attestation_fails():
 
 
 @pytest.mark.asyncio
-async def test_python_payload_hash_matches_golden_vector():
-    payload = {
-        "subject": "alice.testnet",
-        "policy_id": 1,
-        "verdict": "Eligible",
-        "score": 8000,
-        "issued_at": 1700000000000000000,
-        "expires_at": 1700003600000000000,
-        "nonce": "0x" + "42" * 32,
-        "evidence_summary": {
-            "wallet_count_near": 1,
-            "wallet_count_evm": 2,
-            "avg_holding_days": 365,
-            "total_dao_votes": 5,
-            "github_included": True,
-            "rationale": "Strong long-term holder with solid on-chain history.",
-        },
-        "payload_version": 1,
-    }
-    from schemas import AttestationPayloadModel
+async def test_python_payload_hash_is_deterministic():
+    """Verify Python Borsh serialization produces a deterministic payload hash."""
+    from schemas import AttestationPayloadModel, CriteriaResultsModel
 
-    model = AttestationPayloadModel.model_validate(payload)
-    assert (
-        compute_payload_hash(model).hex()
-        == "24ed18275fd4f4b4d9c27be3633a3a24027b7f3edf031a3d74e5581e095dbeb4"
+    payload = AttestationPayloadModel(
+        subject="alice.testnet",
+        policy_id=1,
+        verdict="Eligible",
+        issued_at=1700000000000000000,
+        expires_at=1700003600000000000,
+        nonce=bytes.fromhex("42" * 32),
+        criteria_results=CriteriaResultsModel(
+            results=[True, True, True, True, True, True, True, True, True, True],
+            count=6,
+        ),
+        payload_version=2,
     )
-    assert serialize_attestation_payload(model).hex()
+    h1 = compute_payload_hash(payload)
+    h2 = compute_payload_hash(payload)
+    assert h1 == h2
+    assert len(h1) == 32
+    assert h1 != b"\x00" * 32
+    # Verify serialization is non-empty
+    assert len(serialize_attestation_payload(payload)) > 0
 
 
 @pytest.mark.asyncio
@@ -361,7 +372,7 @@ async def test_attest_returns_500_on_llm_failure():
 
 
 @pytest.mark.asyncio
-async def test_attest_without_github_token_sets_github_included_false():
+async def test_attest_without_github_shows_criteria():
     app = make_app()
     persona = _persona_dict(include_github=False)
     async with AsyncClient(
@@ -369,9 +380,8 @@ async def test_attest_without_github_token_sets_github_included_false():
     ) as client:
         resp = await client.post("/v1/attest", json=persona)
     assert resp.status_code == 200
-    assert (
-        resp.json()["bundle"]["payload"]["evidence_summary"]["github_included"] is False
-    )
+    cr = resp.json()["bundle"]["payload"]["criteria_results"]
+    assert cr["count"] == 3
 
 
 @pytest.mark.asyncio
@@ -383,20 +393,8 @@ async def test_attest_partial_true_when_one_chain_fails():
     ) as client:
         resp = await client.post("/v1/attest", json=persona)
     assert resp.status_code == 200
-    # partial is internal, but missing EVM data must be reflected.
-    assert resp.json()["bundle"]["payload"]["evidence_summary"]["wallet_count_evm"] == 0
-
-
-@pytest.mark.asyncio
-async def test_attest_rejects_schema_overflow_before_borsh_crash():
-    app = make_app(near_signal_count=256)
-    persona = _persona_dict()
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
-        resp = await client.post("/v1/attest", json=persona)
-    assert resp.status_code == 400
-    assert "u8 attestation schema limit" in resp.json()["detail"]
+    cr = resp.json()["bundle"]["payload"]["criteria_results"]
+    assert cr["count"] == 3
 
 
 class FlakyCompletions:

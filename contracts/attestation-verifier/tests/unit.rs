@@ -1,7 +1,7 @@
 use attestation_verifier::AttestationVerifier;
 use near_sdk::test_utils::VMContextBuilder;
 use near_sdk::{testing_env, AccountId};
-use tee_shared::{AttestationBundle, AttestationPayload, EvidenceSummary, Verdict};
+use tee_shared::{AttestationBundle, AttestationPayload, CriteriaResults, Verdict};
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -28,19 +28,11 @@ fn dummy_payload() -> AttestationPayload {
         subject: "alice.testnet".parse().unwrap(),
         policy_id: 1,
         verdict: Verdict::Eligible,
-        score: 8000,
         issued_at: 1_000_000_000_000_000_000,
         expires_at: 2_000_000_000_000_000_000,
         nonce: [0x42u8; 32],
-        evidence_summary: EvidenceSummary {
-            wallet_count_near: 1,
-            wallet_count_evm: 2,
-            avg_holding_days: 365,
-            total_dao_votes: 5,
-            github_included: true,
-            rationale: "Strong holder".to_string(),
-        },
-        payload_version: 1,
+        criteria_results: CriteriaResults::from_vec(vec![true, true, true]),
+        payload_version: 2,
     }
 }
 
@@ -220,7 +212,7 @@ fn test_borsh_hash_sensitive_to_payload_changes() {
 
     let original = dummy_payload();
     let mut mutated = original.clone();
-    mutated.score = original.score + 1;
+    mutated.criteria_results = CriteriaResults::from_vec(vec![true, false, true]);
 
     let h_orig = tee_shared::payload_hash(&original);
     let h_mut = tee_shared::payload_hash(&mutated);

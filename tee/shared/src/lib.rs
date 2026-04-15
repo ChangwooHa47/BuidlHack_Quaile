@@ -19,6 +19,7 @@
 pub mod attestation;
 pub mod canonical;
 pub mod contribution;
+pub mod criteria;
 pub mod policy;
 
 // TEE-only: compiled out of contract wasm to keep binary lean
@@ -80,10 +81,8 @@ impl From<U128> for u128 {
 }
 
 // ── Re-exports ─────────────────────────────────────────────────────────────
-pub use attestation::{
-    AttestationBundle, AttestationPayload, EvidenceSummary, Hash32, Nonce, Verdict,
-    RATIONALE_MAX_CHARS,
-};
+pub use attestation::{AttestationBundle, AttestationPayload, Hash32, Nonce, Verdict};
 pub use canonical::payload_hash;
 pub use contribution::{Contribution, ContributionOutcome};
+pub use criteria::{CriteriaResults, Criterion, MAX_CRITERIA};
 pub use policy::{PaymentToken, Policy, PolicyId, PolicyStatus, SaleConfig, Timestamp};

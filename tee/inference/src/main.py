@@ -23,8 +23,8 @@ from pipeline import (
     process_persona,
 )
 from schemas import (
-    AttestationBundleWithReportModel,
     AttestationInfoModel,
+    AttestationResponseModel,
     PersonaSubmission,
     PolicyModel,
 )
@@ -163,8 +163,8 @@ def create_app(services: AppServices | None = None) -> FastAPI:
             signing_address=signer.address, key_id=signer.key_id, tee_report=None
         )
 
-    @app.post("/v1/attest", response_model=AttestationBundleWithReportModel)
-    async def attest(persona: PersonaSubmission) -> AttestationBundleWithReportModel:
+    @app.post("/v1/attest", response_model=AttestationResponseModel)
+    async def attest(persona: PersonaSubmission) -> AttestationResponseModel:
         try:
             return await process_persona(persona, app.state.services.deps)
         except OwnershipError as exc:

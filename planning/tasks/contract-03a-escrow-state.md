@@ -1,6 +1,6 @@
 ---
 id: contract-03a-escrow-state
-status: todo
+status: done
 sub: BE
 layer: contract
 depends_on: [contract-01-policy-registry, contract-02-attestation-verifier]

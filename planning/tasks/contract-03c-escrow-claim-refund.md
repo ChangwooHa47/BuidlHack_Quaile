@@ -1,6 +1,6 @@
 ---
 id: contract-03c-escrow-claim-refund
-status: todo
+status: done
 sub: BE
 layer: contract
 depends_on: [contract-03b-escrow-settlement]

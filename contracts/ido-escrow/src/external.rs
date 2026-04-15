@@ -11,7 +11,12 @@ pub trait PolicyRegistryExt {
 
 #[ext_contract(ext_verifier)]
 pub trait AttestationVerifierExt {
-    fn is_eligible(&self, bundle: AttestationBundle) -> bool;
+    fn verify(&self, bundle: AttestationBundle) -> bool;
+}
+
+#[ext_contract(ext_zk_verifier)]
+pub trait ZkVerifierExt {
+    fn verify_proof(&self, proof_json: String, public_inputs_json: String) -> bool;
 }
 
 #[ext_contract(ext_ft)]
@@ -26,9 +31,22 @@ pub trait IdoEscrowCallbacks {
         policy_id: PolicyId,
         investor: AccountId,
         bundle: AttestationBundle,
+        zk_proof_json: String,
+        zk_public_inputs_json: String,
     ) -> Promise;
 
-    fn on_is_eligible(
+    fn on_verify_signature(
+        &mut self,
+        policy_id: PolicyId,
+        investor: AccountId,
+        subscription_end: Timestamp,
+        attestation_hash: Hash32,
+        nonce: [u8; 32],
+        zk_proof_json: String,
+        zk_public_inputs_json: String,
+    ) -> Promise;
+
+    fn on_zk_verified(
         &mut self,
         policy_id: PolicyId,
         investor: AccountId,

@@ -11,22 +11,22 @@ from crypto import TeeSigner
 from ownership import FreshnessError, verify_all_wallets
 from schemas import (
     AggregatedSignalModel,
-    AttestationBundleWithReportModel,
     AttestationPayloadModel,
-    EvidenceSummaryModel,
+    AttestationResponseModel,
+    CriteriaResultsModel,
+    CriteriaRulesModel,
     EvmWalletProofModel,
     JudgeOutputModel,
     NearWalletProofModel,
     PersonaSubmission,
     PolicyModel,
-    StructuredRulesModel,
+    ZkCircuitInputModel,
 )
 
 FRESHNESS_NS = 15 * 60 * 1_000_000_000
 RATIONALE_MAX_CHARS = 280
-PAYLOAD_VERSION = 1
-MAX_U8 = 2**8 - 1
-MAX_U32 = 2**32 - 1
+PAYLOAD_VERSION = 2
+MAX_CRITERIA = 10
 
 RE_ETH_ADDR = re.compile(r"\b0x[a-fA-F0-9]{40}\b")
 RE_NEAR_ACC = re.compile(r"\b[a-z0-9_\-]+(?:\.[a-z0-9_\-]+)+\b")
@@ -53,10 +53,10 @@ class GithubIngestor(Protocol):
 
 
 class LlmClient(Protocol):
-    async def structurize(self, natural_language: str) -> StructuredRulesModel: ...
+    async def structurize(self, natural_language: str) -> CriteriaRulesModel: ...
     async def judge(
         self,
-        rules: StructuredRulesModel,
+        rules: CriteriaRulesModel,
         signals: AggregatedSignalModel,
         self_intro: str,
     ) -> JudgeOutputModel: ...
@@ -106,12 +106,15 @@ def _check_client_freshness(client_timestamp: int, now_ns: int | None = None) ->
 
 
 def validate_judge_output(out: JudgeOutputModel, self_intro: str) -> None:
-    if not (0 <= out.score <= 10_000):
-        raise LlmJudgeFailed("score must be in 0..=10000")
-    if not (0 <= out.quantitative_score <= 10_000):
-        raise LlmJudgeFailed("quantitative_score must be in 0..=10000")
-    if not (0 <= out.qualitative_score <= 10_000):
-        raise LlmJudgeFailed("qualitative_score must be in 0..=10000")
+    if not out.criteria:
+        raise LlmJudgeFailed("criteria list must not be empty")
+    if len(out.criteria) > MAX_CRITERIA:
+        raise LlmJudgeFailed(f"too many criteria: {len(out.criteria)} > {MAX_CRITERIA}")
+    all_pass = all(c.passed for c in out.criteria)
+    if out.verdict == "Eligible" and not all_pass:
+        raise LlmJudgeFailed("verdict is Eligible but not all criteria passed")
+    if out.verdict == "Ineligible" and all_pass:
+        raise LlmJudgeFailed("verdict is Ineligible but all criteria passed")
     if len(out.rationale) > RATIONALE_MAX_CHARS:
         raise PiiLeakError("rationale exceeds 280 chars")
     if RE_ETH_ADDR.search(out.rationale):
@@ -124,51 +127,45 @@ def validate_judge_output(out: JudgeOutputModel, self_intro: str) -> None:
         raise PiiLeakError("URL in rationale")
     compact_intro = re.sub(r"\s+", " ", self_intro.lower()).strip()
     compact_rationale = re.sub(r"\s+", " ", out.rationale.lower()).strip()
-    # Catch meaningful copied spans without rejecting common words.
     for start in range(0, max(0, len(compact_intro) - 15)):
         if compact_intro[start : start + 16] in compact_rationale:
             raise PiiLeakError("self_intro substring leaked into rationale")
 
 
-def build_evidence_summary(
-    signals: AggregatedSignalModel, out: JudgeOutputModel
-) -> EvidenceSummaryModel:
-    wallet_count_near = len(signals.near)
-    wallet_count_evm = len(signals.evm)
-    if wallet_count_near > MAX_U8 or wallet_count_evm > MAX_U8:
-        raise PolicyValidationError("wallet counts exceed u8 attestation schema limit")
+def payload_hash_to_limbs(h: bytes) -> list[str]:
+    """32-byte hash → 4 x 64-bit limbs (big-endian per limb)."""
+    assert len(h) == 32
+    limbs = []
+    for i in range(4):
+        chunk = h[i * 8 : (i + 1) * 8]
+        val = int.from_bytes(chunk, "big")
+        limbs.append(str(val))
+    return limbs
 
-    all_holding_days = [w.holding_days for w in signals.near] + [
-        w.holding_days for w in signals.evm
-    ]
-    avg_holding_days = (
-        int(sum(all_holding_days) / len(all_holding_days)) if all_holding_days else 0
-    )
-    total_dao_votes = sum(len(w.dao_votes) for w in signals.near)
-    if avg_holding_days > MAX_U32:
-        raise PolicyValidationError(
-            "avg_holding_days exceeds u32 attestation schema limit"
-        )
-    if total_dao_votes > MAX_U32:
-        raise PolicyValidationError(
-            "total_dao_votes exceeds u32 attestation schema limit"
-        )
 
-    return EvidenceSummaryModel(
-        wallet_count_near=wallet_count_near,
-        wallet_count_evm=wallet_count_evm,
-        avg_holding_days=avg_holding_days,
-        total_dao_votes=total_dao_votes,
-        github_included=signals.github is not None,
-        rationale=out.rationale,
+def build_zk_input(
+    payload_hash: bytes, criteria_results: CriteriaResultsModel
+) -> ZkCircuitInputModel:
+    return ZkCircuitInputModel(
+        payload_hash_limbs=payload_hash_to_limbs(payload_hash),
+        criteria=[1 if r else 0 for r in criteria_results.results],
+        criteria_count=str(criteria_results.count),
     )
+
+
+def build_criteria_results(out: JudgeOutputModel) -> CriteriaResultsModel:
+    passes = [c.passed for c in out.criteria]
+    count = len(passes)
+    # Pad to MAX_CRITERIA with True
+    padded = passes + [True] * (MAX_CRITERIA - count)
+    return CriteriaResultsModel(results=padded, count=count)
 
 
 async def process_persona(
     persona: PersonaSubmission,
     deps: PipelineDeps,
     now_ns: int | None = None,
-) -> AttestationBundleWithReportModel:
+) -> AttestationResponseModel:
     now = _now_ns() if now_ns is None else now_ns
     try:
         _check_client_freshness(persona.client_timestamp, now)
@@ -239,17 +236,16 @@ async def process_persona(
             raise LlmJudgeFailed(str(exc)) from exc
 
         validate_judge_output(judge_out, persona.self_intro)
-        evidence_summary = build_evidence_summary(aggregated, judge_out)
+        criteria_results = build_criteria_results(judge_out)
 
         payload = AttestationPayloadModel(
             subject=persona.near_account,
             policy_id=persona.policy_id,
             verdict=judge_out.verdict,
-            score=judge_out.score,
             issued_at=now,
             expires_at=policy.sale_config.subscription_end,
             nonce=persona.nonce,
-            evidence_summary=evidence_summary,
+            criteria_results=criteria_results,
             payload_version=PAYLOAD_VERSION,
         )
 
@@ -262,7 +258,10 @@ async def process_persona(
             signing_address=deps.signer.address,
             nonce_hex=bundle.payload_hash.hex(),
         )
-        return AttestationBundleWithReportModel(bundle=bundle, tee_report=tee_report)
+        zk_input = build_zk_input(digest, criteria_results)
+        return AttestationResponseModel(
+            bundle=bundle, tee_report=tee_report, zk_input=zk_input
+        )
     finally:
         persona.self_intro = ""
         persona.github_oauth_token = None

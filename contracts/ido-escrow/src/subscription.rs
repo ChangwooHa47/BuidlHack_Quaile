@@ -7,19 +7,26 @@ use tee_shared::{
 };
 
 use crate::events::{emit_contribution_created, emit_contribution_failed};
-use crate::external::{ext_policy_registry, ext_self, ext_verifier};
+use crate::external::{ext_policy_registry, ext_self, ext_verifier, ext_zk_verifier};
 use crate::state::{compute_contribution_key, compute_nonce_key, PolicyInvestorKey};
 use crate::IdoEscrow;
 
 const GAS_VIEW: Gas = Gas::from_tgas(30);
-const GAS_CALLBACK_POLICY: Gas = Gas::from_tgas(60);
-const GAS_CALLBACK_ELIGIBLE: Gas = Gas::from_tgas(30);
+const GAS_CALLBACK_POLICY: Gas = Gas::from_tgas(90);
+const GAS_CALLBACK_SIGNATURE: Gas = Gas::from_tgas(60);
+const GAS_CALLBACK_ZK: Gas = Gas::from_tgas(30);
 
 #[near_bindgen]
 impl IdoEscrow {
     /// Investor entry point. Attach NEAR deposit to contribute to a policy.
     #[payable]
-    pub fn contribute(&mut self, policy_id: PolicyId, bundle: AttestationBundle) -> Promise {
+    pub fn contribute(
+        &mut self,
+        policy_id: PolicyId,
+        bundle: AttestationBundle,
+        zk_proof_json: String,
+        zk_public_inputs_json: String,
+    ) -> Promise {
         let investor = env::predecessor_account_id();
         let deposit = env::attached_deposit();
 
@@ -96,7 +103,7 @@ impl IdoEscrow {
             .then(
                 ext_self::ext(env::current_account_id())
                     .with_static_gas(GAS_CALLBACK_POLICY)
-                    .on_get_policy(policy_id, investor, bundle),
+                    .on_get_policy(policy_id, investor, bundle, zk_proof_json, zk_public_inputs_json),
             )
     }
 
@@ -106,6 +113,8 @@ impl IdoEscrow {
         policy_id: PolicyId,
         investor: AccountId,
         bundle: AttestationBundle,
+        zk_proof_json: String,
+        zk_public_inputs_json: String,
         #[callback_result] policy_result: Result<Option<Policy>, PromiseError>,
     ) -> Promise {
         let policy = match policy_result {
@@ -141,36 +150,77 @@ impl IdoEscrow {
 
         let subscription_end = policy.sale_config.subscription_end;
 
+        // Step 2: TEE signature verification (verify only, not is_eligible)
         ext_verifier::ext(self.attestation_verifier.clone())
             .with_static_gas(GAS_VIEW)
-            .is_eligible(bundle.clone())
+            .verify(bundle.clone())
             .then(
                 ext_self::ext(env::current_account_id())
-                    .with_static_gas(GAS_CALLBACK_ELIGIBLE)
-                    .on_is_eligible(
+                    .with_static_gas(GAS_CALLBACK_SIGNATURE)
+                    .on_verify_signature(
                         policy_id,
                         investor,
                         subscription_end,
                         bundle.payload_hash,
                         bundle.payload.nonce,
+                        zk_proof_json,
+                        zk_public_inputs_json,
                     ),
             )
     }
 
     #[private]
-    pub fn on_is_eligible(
+    pub fn on_verify_signature(
         &mut self,
         policy_id: PolicyId,
         investor: AccountId,
         subscription_end: Timestamp,
         attestation_hash: Hash32,
         nonce: [u8; 32],
-        #[callback_result] eligible: Result<bool, PromiseError>,
-    ) -> PromiseOrValue<bool> {
-        match eligible {
+        zk_proof_json: String,
+        zk_public_inputs_json: String,
+        #[callback_result] verified: Result<bool, PromiseError>,
+    ) -> Promise {
+        match verified {
             Err(_) | Ok(false) => {
                 let refund = self.rollback_contribution(&investor, policy_id, nonce);
-                emit_contribution_failed(investor.as_str(), policy_id, "IneligibleAttestation");
+                emit_contribution_failed(investor.as_str(), policy_id, "SignatureVerificationFailed");
+                Promise::new(investor).transfer(NearToken::from_yoctonear(refund))
+            }
+            Ok(true) => {
+                // Step 3: ZK proof verification
+                ext_zk_verifier::ext(self.zk_verifier.clone())
+                    .with_static_gas(GAS_VIEW)
+                    .verify_proof(zk_proof_json, zk_public_inputs_json)
+                    .then(
+                        ext_self::ext(env::current_account_id())
+                            .with_static_gas(GAS_CALLBACK_ZK)
+                            .on_zk_verified(
+                                policy_id,
+                                investor,
+                                subscription_end,
+                                attestation_hash,
+                                nonce,
+                            ),
+                    )
+            }
+        }
+    }
+
+    #[private]
+    pub fn on_zk_verified(
+        &mut self,
+        policy_id: PolicyId,
+        investor: AccountId,
+        subscription_end: Timestamp,
+        attestation_hash: Hash32,
+        nonce: [u8; 32],
+        #[callback_result] zk_valid: Result<bool, PromiseError>,
+    ) -> PromiseOrValue<bool> {
+        match zk_valid {
+            Err(_) | Ok(false) => {
+                let refund = self.rollback_contribution(&investor, policy_id, nonce);
+                emit_contribution_failed(investor.as_str(), policy_id, "ZkProofFailed");
                 PromiseOrValue::Promise(
                     Promise::new(investor).transfer(NearToken::from_yoctonear(refund)),
                 )

@@ -7,9 +7,10 @@
 
 use borsh::{BorshDeserialize, BorshSerialize};
 use tee_shared::{
-    attestation::{AttestationBundle, AttestationPayload, EvidenceSummary, Verdict},
+    attestation::{AttestationBundle, AttestationPayload, Verdict},
     canonical::payload_hash,
     contribution::{Contribution, ContributionOutcome},
+    criteria::CriteriaResults,
     persona::{build_canonical_message, EvmWalletProof, NearWalletProof, Persona, Wallets, FRESHNESS_NS},
     policy::{PaymentToken, Policy, PolicyStatus, SaleConfig},
     rules::{RuleWeights, StructuredRules},
@@ -45,19 +46,11 @@ fn dummy_payload() -> AttestationPayload {
         subject: "alice.testnet".to_string(),
         policy_id: 1,
         verdict: Verdict::Eligible,
-        score: 8000,
         issued_at: 1_700_000_000_000_000_000,
         expires_at: 1_700_003_600_000_000_000,
         nonce: [0x42u8; 32],
-        evidence_summary: EvidenceSummary {
-            wallet_count_near: 1,
-            wallet_count_evm: 2,
-            avg_holding_days: 365,
-            total_dao_votes: 5,
-            github_included: true,
-            rationale: "Strong long-term holder with solid on-chain history.".to_string(),
-        },
-        payload_version: 1,
+        criteria_results: CriteriaResults::from_vec(vec![true, true, true, true, true, true]),
+        payload_version: 2,
     }
 }
 
@@ -109,16 +102,37 @@ fn verdict_variants_roundtrip() {
 }
 
 #[test]
-fn evidence_summary_empty_rationale_allowed() {
-    let summary = EvidenceSummary {
-        wallet_count_near: 0,
-        wallet_count_evm: 0,
-        avg_holding_days: 0,
-        total_dao_votes: 0,
-        github_included: false,
-        rationale: String::new(),
-    };
-    roundtrip(&summary);
+fn criteria_results_roundtrip() {
+    let cr = CriteriaResults::from_vec(vec![true, true, true]);
+    roundtrip(&cr);
+}
+
+#[test]
+fn criteria_results_all_pass() {
+    assert!(CriteriaResults::from_vec(vec![true, true, true]).all_pass());
+    assert!(!CriteriaResults::from_vec(vec![true, false, true]).all_pass());
+}
+
+#[test]
+fn criteria_results_padding() {
+    let cr = CriteriaResults::from_vec(vec![true, true, true]);
+    assert_eq!(cr.count, 3);
+    // padding slots must be true
+    for i in 3..10 {
+        assert!(cr.results[i]);
+    }
+}
+
+#[test]
+#[should_panic(expected = "at least one criterion required")]
+fn criteria_results_empty_panics() {
+    CriteriaResults::from_vec(vec![]);
+}
+
+#[test]
+#[should_panic(expected = "too many criteria")]
+fn criteria_results_overflow_panics() {
+    CriteriaResults::from_vec(vec![true; 11]);
 }
 
 // ── Test 3: payload_hash consistency ──────────────────────────────────────
@@ -135,9 +149,9 @@ fn payload_hash_is_deterministic() {
 fn payload_hash_changes_with_field() {
     let mut p = dummy_payload();
     let h1 = payload_hash(&p);
-    p.score = 9999;
+    p.criteria_results = CriteriaResults::from_vec(vec![true, false, true]);
     let h2 = payload_hash(&p);
-    assert_ne!(h1, h2, "different scores must produce different hashes");
+    assert_ne!(h1, h2, "different criteria must produce different hashes");
 }
 
 #[test]
@@ -300,28 +314,44 @@ fn structured_rules_serde_roundtrip() {
 
 // ── Test 8: payload_hash golden vector ────────────────────────────────────
 //
-// This constant pins the expected keccak256(borsh(dummy_payload())) output.
-// It serves as the cross-feature equivalence proof: the same 32-byte value
-// must be produced by:
-//   - std mode  : sha3::Keccak256 (this test)
-//   - contract mode: near_sdk::env::keccak256_array (wasm runtime; verified in test-02)
-//   - Python TEE    : eth_hash / pycryptodome keccak256 (golden-vector CI in test-02)
-//
-// If any of the three implementations diverges, at least one golden-vector
-// test will fail — making the divergence immediately visible.
+// Golden vector will be recomputed in zk-08 after all schema changes settle.
+// For now, just verify determinism and cross-feature consistency.
+
+// Golden vector dummy uses the spec from zk-08:
+// criteria_results = [true; 10], count = 6, payload_version = 2
+fn golden_dummy_payload() -> AttestationPayload {
+    AttestationPayload {
+        subject: "alice.testnet".to_string(),
+        policy_id: 1,
+        verdict: Verdict::Eligible,
+        issued_at: 1_700_000_000_000_000_000,
+        expires_at: 1_700_003_600_000_000_000,
+        nonce: [0x42u8; 32],
+        criteria_results: CriteriaResults {
+            results: [true; 10],
+            count: 6,
+        },
+        payload_version: 2,
+    }
+}
+
+#[test]
+fn payload_hash_std_is_deterministic_and_nonzero() {
+    let h = payload_hash(&golden_dummy_payload());
+    assert_ne!(h, [0u8; 32], "payload_hash must not be all-zero");
+    assert_eq!(h, payload_hash(&golden_dummy_payload()));
+}
+
 const GOLDEN_PAYLOAD_HASH: [u8; 32] = [
-    0x24, 0xed, 0x18, 0x27, 0x5f, 0xd4, 0xf4, 0xb4,
-    0xd9, 0xc2, 0x7b, 0xe3, 0x63, 0x3a, 0x3a, 0x24,
-    0x02, 0x7b, 0x7f, 0x3e, 0xdf, 0x03, 0x1a, 0x3d,
-    0x74, 0xe5, 0x58, 0x1e, 0x09, 0x5d, 0xbe, 0xb4,
+    0xd7, 0x4e, 0xe7, 0x8f, 0xe3, 0xae, 0x2d, 0x96,
+    0x95, 0x39, 0xea, 0x33, 0x86, 0xa0, 0xc1, 0xe4,
+    0x36, 0xb9, 0x94, 0x07, 0x67, 0x71, 0xcc, 0x45,
+    0xb1, 0xdc, 0xee, 0x75, 0x4e, 0xd9, 0x76, 0x91,
 ];
 
 #[test]
 fn payload_hash_std_golden_vector() {
-    // Verifies that the std (sha3 crate) keccak256 implementation produces the
-    // canonical golden hash for dummy_payload(). This same input/output pair is
-    // used in test-02 to assert std == contract == Python equivalence.
-    let computed = payload_hash(&dummy_payload());
+    let computed = payload_hash(&golden_dummy_payload());
     assert_eq!(
         computed, GOLDEN_PAYLOAD_HASH,
         "payload_hash diverged from golden vector — \
@@ -333,14 +363,12 @@ fn payload_hash_std_golden_vector() {
 
 #[test]
 fn payload_hash_golden_hex_string() {
-    // Canonical hex form used as the cross-language reference value in test-02.
     let hex: String = GOLDEN_PAYLOAD_HASH
         .iter()
         .map(|b| format!("{:02x}", b))
         .collect();
     assert_eq!(
         hex,
-        "24ed18275fd4f4b4d9c27be3633a3a24027b7f3edf031a3d74e5581e095dbeb4",
-        "GOLDEN_PAYLOAD_HASH constant and its hex representation must agree",
+        "d74ee78fe3ae2d969539ea3386a0c1e436b994076771cc45b1dcee754ed97691",
     );
 }

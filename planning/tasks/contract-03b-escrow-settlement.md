@@ -1,6 +1,6 @@
 ---
 id: contract-03b-escrow-settlement
-status: todo
+status: done
 sub: BE
 layer: contract
 depends_on: [contract-03a-escrow-state]

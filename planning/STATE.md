@@ -7,59 +7,79 @@
 
 ## Current Iteration
 
-- **Iteration**: 1 ✓ / 2 ✓ / 3 ✓ / 4 ✓ / **READY FOR IMPLEMENTATION (confirmed)**
-- **Phase**: planning complete → loop TERMINATED
-- **Last Updated**: 2026-04-12
-- **Mode**: autonomous loop — **STOPPED** (Quality Gates all ✅, no more productive work at planning level)
+- **Iteration**: 1 ✓ / 2 ✓ / 3 ✓ / 4 ✓ / **5 (ZK migration) — IN PROGRESS**
+- **Phase**: implementation — ZK eligibility migration
+- **Last Updated**: 2026-04-15
+- **Mode**: Dev Agent 실행 대기
 
-## 🎯 READY FOR IMPLEMENTATION
+## 🎯 ZK ELIGIBILITY MIGRATION
 
-3 iterations 후 blocker 0에 도달 (iteration-3.md 리뷰 기준 "CLOSE" 판정 + 6개 cosmetic cleanup 처리).
+**아키텍처 변경**: TEE score+evidence → 항목별 pass/fail + circom groth16 ZK proof
 
-**구현 시작 전 체크**:
-1. `planning/reviews/iteration-3.md` 전문 읽기
-2. 사용자 확인 ("내가 여기서부터 이어받겠다")
-3. 아래 **태스크 의존성 순서**대로 진행
+기존 Phase 1~5 태스크는 `done` 상태. 아래 ZK 태스크가 신규 구현 대상.
 
-### 태스크 실행 순서 (topological)
+**설계 문서**: `docs/superpowers/plans/2026-04-15-zk-eligibility-migration.md`
 
-**Phase 1 — Foundation** (순차)
-1. `infra-01-monorepo-init` — 워크스페이스 준비
-2. `tee-01-persona-schema` — shared crate (모든 후속 작업이 여기 의존)
+### 완료된 태스크 (Phase 1~5)
 
-**Phase 2 — Contracts** (병렬 가능)
-3. `contract-01-policy-registry`
-4. `contract-02-attestation-verifier`
-5. `contract-04-mock-ft`
+| ID | 태스크 | 상태 |
+|---|---|---|
+| infra-01 | monorepo init | done |
+| tee-01 | persona schema (shared crate) | done |
+| contract-01 | policy-registry | done |
+| contract-02 | attestation-verifier | done |
+| contract-04 | mock-ft | done |
+| tee-03 | ownership verification | done |
+| ingest-01 | NEAR RPC | done |
+| ingest-02 | EVM multichain | done |
+| ingest-03 | GitHub | done |
+| tee-02 | inference service (FastAPI) | done |
+| contract-03a | escrow state | done |
+| contract-03b | escrow settlement | done |
+| contract-03c | escrow claim/refund | done |
 
-**Phase 3 — TEE infrastructure** (병렬 가능)
-6. `tee-03-ownership-verification`
-7. `ingest-01-near-rpc`
-8. `ingest-02-evm-multichain`
-9. `ingest-03-github`
-10. `tee-06-key-bootstrap`
+### ZK 태스크 실행 순서 (topological)
 
-**Phase 4 — TEE integration** (순차)
-11. `tee-02-inference-service` (FastAPI skeleton)
-12. `tee-04-llm-judge`
-13. `tee-05-signer-and-report`
+**Phase 7 — ZK Foundation** (병렬 가능)
+1. `zk-01-circom-circuit` — circom eligibility circuit + trusted setup
+2. `zk-02-shared-criteria-types` — tee-shared: score→CriteriaResults 타입 전환
 
-**Phase 5 — IDO Escrow** (순차 — contract-03a → 03b → 03c)
-14. `contract-03a-escrow-state`
-15. `contract-03b-escrow-settlement`
-16. `contract-03c-escrow-claim-refund`
+**Phase 8 — Schema Propagation** (병렬 가능, 둘 다 zk-02 의존)
+3. `zk-03-contracts-schema-propagation` — contracts 컴파일 에러 수정
+4. `zk-06-tee-python-criteria` — TEE Python LLM 프롬프트 + 파이프라인 변경
 
-**Phase 6 — Integration**
-17. `test-02-cross-lang-borsh` (Rust ↔ Python 골든 벡터)
-18. `infra-02-testnet-deploy`
-19. `test-01-e2e-demo`
+**Phase 9 — ZK Integration** (순차)
+5. `zk-04-zk-verifier-contract` — 온체인 groth16 verifier (zk-01, zk-03 의존)
+6. `zk-05-escrow-zk-integration` — ido-escrow contribute() ZK 통합 (zk-03, zk-04 의존)
+7. `zk-07-tee-zk-input-response` — TEE 응답에 ZK circuit 입력 포함 (zk-06 의존)
+
+**Phase 10 — Verification**
+8. `zk-08-golden-vectors` — Rust↔Python Borsh 골든 벡터 재생성 (zk-02, zk-06 의존)
+9. `zk-09-integration-build` — 최종 통합 빌드 + 정리 (전부 의존)
+
+### Dev Agent 커밋 규칙
+- 각 zk-NN 태스크 완료 = 1 커밋
+- 태스크 완료 후 코드리뷰 체크포인트 수행 (각 태스크 파일 하단 참조)
+- 태스크 status: `todo` → `in_progress` → `done`
+
+### 남은 기존 태스크 (ZK 완료 후)
+
+| ID | 태스크 | 상태 | 비고 |
+|---|---|---|---|
+| tee-04 | llm-judge | superseded | zk-06으로 대체 |
+| tee-05 | signer-and-report | todo | TEE 서명 + TDX report — ZK와 독립 |
+| tee-06 | key-bootstrap | todo | TEE signing key 생성/배포 |
+| test-02 | cross-lang-borsh | superseded | zk-08로 대체 |
+| infra-02 | testnet-deploy | todo | |
+| test-01 | e2e-demo | todo | |
 
 **알려진 deferred items** (구현 중 필요 시 해결):
-- ~~TDX `report_data` 정확한 인코딩~~ ✅ **iteration 4에서 CLOSED** — `address_bytes(20) + zero_pad(12) || nonce(32)`, raw concat, 출처: nearai-cloud-verifier. research §11 + tee-05 참조.
-- `signing_key_id` 단순화 여부 (contract-02 Open Question) — 현 설계 유지해도 OK. 차단 아님.
+- ~~TDX `report_data` 정확한 인코딩~~ ✅ **iteration 4에서 CLOSED**
+- `signing_key_id` 단순화 여부 — 현 설계 유지. 차단 아님.
 - NEAR AI Cloud API key 발급 절차 — 실제 배포 시 확인. 차단 아님.
 - Rate limit + 가격 정보 — 데모 비용 산정 필요 시. 차단 아님.
 - NVIDIA NRAS JWT 온체인 검증 대체 — 로드맵. 차단 아님.
+- **NEAR alt_bn128 precompile 안정화** — 현재 MVP는 off-chain verifier trust model. 안정화 시 온체인 pairing으로 전환.
 
 ---
 
