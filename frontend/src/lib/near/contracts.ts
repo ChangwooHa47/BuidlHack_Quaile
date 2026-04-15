@@ -35,9 +35,11 @@ export interface OnChainContribution {
 }
 
 export interface PolicyTotals {
-  total_contributed: string;
+  total_demand: string;
   total_matched: string;
-  contribution_count: number;
+  ratio_bps: number;
+  settled_at: number;
+  is_complete: boolean;
 }
 
 /**

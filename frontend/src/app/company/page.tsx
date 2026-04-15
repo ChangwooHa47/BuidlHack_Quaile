@@ -33,11 +33,11 @@ const PROJECT = {
     { label: "Vesting", value: "6 month linear" },
   ],
   recentContributions: [
-    { investor: "alice.testnet", amount: "$500,000", time: "2 min ago" },
-    { investor: "bob.testnet", amount: "$1,200,000", time: "15 min ago" },
-    { investor: "carol.testnet", amount: "$340,000", time: "1 hr ago" },
-    { investor: "dave.testnet", amount: "$800,000", time: "3 hr ago" },
-    { investor: "eve.testnet", amount: "$2,100,000", time: "5 hr ago" },
+    { label: "Contributor #1", amount: "$500,000", time: "2 min ago" },
+    { label: "Contributor #2", amount: "$1,200,000", time: "15 min ago" },
+    { label: "Contributor #3", amount: "$340,000", time: "1 hr ago" },
+    { label: "Contributor #4", amount: "$800,000", time: "3 hr ago" },
+    { label: "Contributor #5", amount: "$2,100,000", time: "5 hr ago" },
   ],
 };
 
@@ -130,9 +130,9 @@ export default function CompanyDashboard() {
             </div>
             <div className="mt-md divide-y divide-alpha-12">
               {PROJECT.recentContributions.map((c) => (
-                <div key={c.investor + c.time} className="flex items-center justify-between py-[10px]">
+                <div key={c.label + c.time} className="flex items-center justify-between py-[10px]">
                   <div>
-                    <span className="text-sm text-gray-1000">{c.investor}</span>
+                    <span className="text-sm text-gray-1000">{c.label}</span>
                     <span className="ml-2 text-xs text-alpha-40">{c.time}</span>
                   </div>
                   <span className="text-sm font-medium text-gray-1000">{c.amount}</span>
@@ -180,14 +180,14 @@ export default function CompanyDashboard() {
                 </thead>
                 <tbody className="divide-y divide-alpha-12">
                   {[
-                    { investor: "alice.testnet", amount: "$500,000", outcome: "FullMatch" as const, matched: "$500,000", tokens: "250,000", claim: true, refund: false },
-                    { investor: "bob.testnet", amount: "$1,200,000", outcome: "PartialMatch" as const, matched: "$800,000", tokens: "400,000", claim: false, refund: false },
-                    { investor: "carol.testnet", amount: "$340,000", outcome: "NoMatch" as const, matched: "$0", tokens: "0", claim: false, refund: true },
-                    { investor: "dave.testnet", amount: "$800,000", outcome: "FullMatch" as const, matched: "$800,000", tokens: "400,000", claim: true, refund: false },
-                    { investor: "eve.testnet", amount: "$2,100,000", outcome: "PartialMatch" as const, matched: "$1,400,000", tokens: "700,000", claim: false, refund: false },
+                    { label: "#1", amount: "$500,000", outcome: "FullMatch" as const, matched: "$500,000", tokens: "250,000", claim: true, refund: false },
+                    { label: "#2", amount: "$1,200,000", outcome: "PartialMatch" as const, matched: "$800,000", tokens: "400,000", claim: false, refund: false },
+                    { label: "#3", amount: "$340,000", outcome: "NoMatch" as const, matched: "$0", tokens: "0", claim: false, refund: true },
+                    { label: "#4", amount: "$800,000", outcome: "FullMatch" as const, matched: "$800,000", tokens: "400,000", claim: true, refund: false },
+                    { label: "#5", amount: "$2,100,000", outcome: "PartialMatch" as const, matched: "$1,400,000", tokens: "700,000", claim: false, refund: false },
                   ].map((c) => (
-                    <tr key={c.investor}>
-                      <td className="py-sm text-gray-1000">{c.investor}</td>
+                    <tr key={c.label}>
+                      <td className="py-sm text-gray-1000">{c.label}</td>
                       <td className="py-sm text-gray-1000">{c.amount}</td>
                       <td className="py-sm">
                         <span className={`text-xs font-medium ${c.outcome === "FullMatch" ? "text-neon-glow" : c.outcome === "PartialMatch" ? "text-status-subscribing" : "text-status-refund"}`}>

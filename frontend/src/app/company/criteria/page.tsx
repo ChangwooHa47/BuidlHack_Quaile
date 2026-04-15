@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import ProjectHero from "@/components/ProjectHero";
 import { useWallet } from "@/contexts/WalletContext";
-import { registerPolicy, parseNearAmount } from "@/lib/near/transactions";
+import { registerPolicy } from "@/lib/near/transactions";
 
 interface Criterion {
   id: string;
@@ -75,8 +75,8 @@ export default function EvaluationCriteriaPage() {
 
       await registerPolicy(wallet, naturalLanguage, "bafybeibwzifw52ttrkqlikfzext5akxu7lz4xiwjgwzmqcpdzmp3n5mbdq", {
         token_contract: tokenContract,
-        total_allocation: parseNearAmount(totalAllocation),
-        price_per_token: parseNearAmount(pricePerToken),
+        total_allocation: totalAllocation,
+        price_per_token: pricePerToken,
         payment_token: "Near",
         subscription_start: startNs,
         subscription_end: endNs,
