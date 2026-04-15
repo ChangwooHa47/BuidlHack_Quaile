@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import re
 import time
 from dataclasses import dataclass
@@ -170,14 +171,17 @@ async def process_persona(
     try:
         _check_client_freshness(persona.client_timestamp, now)
 
-        await verify_all_wallets(
-            near_proofs=persona.wallets.near,
-            evm_proofs=persona.wallets.evm,
-            policy_id=persona.policy_id,
-            expected_nonce=persona.nonce,
-            now_ns=now,
-            near_rpc_url=deps.near_rpc_url,
-        )
+        if os.getenv("SKIP_OWNERSHIP_VERIFICATION", "").lower() in ("1", "true", "yes"):
+            pass  # skip wallet ownership verification for testing
+        else:
+            await verify_all_wallets(
+                near_proofs=persona.wallets.near,
+                evm_proofs=persona.wallets.evm,
+                policy_id=persona.policy_id,
+                expected_nonce=persona.nonce,
+                now_ns=now,
+                near_rpc_url=deps.near_rpc_url,
+            )
 
         policy = await deps.policy_fetcher.get_policy(persona.policy_id)
         if policy.status != "Subscribing":

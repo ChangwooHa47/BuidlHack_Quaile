@@ -12,6 +12,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from attestation_verifier import verify_near_ai_report
 from config import Config
 from crypto import TeeSigner
+from ingest.chains import SUPPORTED_CHAINS as EVM_CHAINS
+from ingest.evm import EvmIngestor
 from nearai_client import NearAIClient
 from ownership import OwnershipError
 from pipeline import (
@@ -135,7 +137,7 @@ def create_app(services: AppServices | None = None) -> FastAPI:
                     config.near_rpc_url, config.policy_registry_account
                 ),
                 near_ingestor=NoopNearIngestor(),
-                evm_ingestor=NoopEvmIngestor(),
+                evm_ingestor=EvmIngestor({cid: c for cid, c in EVM_CHAINS.items() if c.rpc}) if any(c.rpc for c in EVM_CHAINS.values()) else NoopEvmIngestor(),
                 github_ingestor=NoopGithubIngestor(),
                 llm_client=NearAIClient(
                     api_key=config.near_ai_api_key,
