@@ -87,6 +87,13 @@ def _attestation_report_base_url(openai_base_url: str) -> str:
     return base
 
 
+class DevMockReportClient:
+    """Returns a dummy report for dev/testing. No actual TEE attestation."""
+    async def fetch_report(self, signing_address: str, nonce_hex: str) -> bytes:
+        import json as _json
+        return _json.dumps({"signing_address": signing_address, "nonce": nonce_hex, "dev": True}).encode()
+
+
 class NearAiReportClient:
     def __init__(self, base_url: str, model: str):
         self.base_url = _attestation_report_base_url(base_url)
@@ -145,7 +152,7 @@ def create_app(services: AppServices | None = None) -> FastAPI:
                     model=config.near_ai_model,
                 ),
                 signer=signer,
-                report_client=NearAiReportClient(
+                report_client=DevMockReportClient() if config.allow_dev_signer else NearAiReportClient(
                     base_url=config.near_ai_base_url,
                     model=config.near_ai_model,
                 ),
