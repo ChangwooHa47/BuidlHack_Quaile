@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import StatusBadge from "./StatusBadge";
 import PersonaForm from "./PersonaForm";
 import ContributeButton from "./ContributeButton";
 import { useWallet } from "@/contexts/WalletContext";
 import { useIdentity } from "@/contexts/IdentityContext";
+import { getContribution, type OnChainContribution } from "@/lib/near/contracts";
+import { claim, refund } from "@/lib/near/transactions";
 import type { Phase } from "@/types";
 
 interface SubscribingSidebarProps {
@@ -15,12 +17,60 @@ interface SubscribingSidebarProps {
   policyId?: number;
 }
 
-type Flow = "identity" | "persona" | "contribute";
+type Flow = "identity" | "persona" | "contribute" | "waiting" | "claim" | "refund" | "done";
 
 export default function SubscribingSidebar({ name, ticker, status, policyId }: SubscribingSidebarProps) {
-  const { isConnected } = useWallet();
-  const { nearAccountId, evmWallets, githubConnected } = useIdentity();
+  const { selector, isConnected, accountId } = useWallet();
+  const { evmWallets, githubConnected } = useIdentity();
   const [flow, setFlow] = useState<Flow>("identity");
+  const [contribution, setContribution] = useState<OnChainContribution | null>(null);
+  const [txPending, setTxPending] = useState(false);
+
+  useEffect(() => {
+    if (!accountId || policyId === undefined) return;
+    getContribution(accountId, policyId).then((c) => {
+      setContribution(c);
+      if (!c) {
+        setFlow("identity");
+      } else if (c.outcome === "NotSettled") {
+        setFlow("waiting");
+      } else if (
+        (c.outcome === "FullMatch" && !c.claim_done) ||
+        (c.outcome === "PartialMatch" && !c.claim_done)
+      ) {
+        setFlow("claim");
+      } else if (
+        (c.outcome === "NoMatch" && !c.refund_done) ||
+        (c.outcome === "PartialMatch" && !c.refund_done && c.claim_done)
+      ) {
+        setFlow("refund");
+      } else {
+        setFlow("done");
+      }
+    });
+  }, [accountId, policyId]);
+
+  async function handleClaim() {
+    if (!selector || policyId === undefined) return;
+    setTxPending(true);
+    try {
+      const wallet = await selector.wallet("my-near-wallet");
+      await claim(wallet, policyId);
+      setFlow("done");
+    } catch { /* ignore */ }
+    setTxPending(false);
+  }
+
+  async function handleRefund() {
+    if (!selector || policyId === undefined) return;
+    setTxPending(true);
+    try {
+      const wallet = await selector.wallet("my-near-wallet");
+      await refund(wallet, policyId);
+      setFlow("done");
+    } catch { /* ignore */ }
+    setTxPending(false);
+  }
 
   const isSubscribing = status === "Subscribing";
 
@@ -34,6 +84,7 @@ export default function SubscribingSidebar({ name, ticker, status, policyId }: S
         <StatusBadge phase={status} />
       </div>
 
+      {/* Identity section */}
       <div className="mb-lg">
         <p className="mb-sm text-xs font-medium uppercase tracking-wider text-gray-600">
           Your Identity
@@ -64,6 +115,7 @@ export default function SubscribingSidebar({ name, ticker, status, policyId }: S
         </div>
       </div>
 
+      {/* Flow-based CTA */}
       {flow === "identity" && (
         <div className="space-y-xs">
           <button className="w-full rounded-lg border border-gray-500 py-2.5 text-sm font-medium text-gray-1000 hover:bg-alpha-8 transition-colors">
@@ -90,6 +142,54 @@ export default function SubscribingSidebar({ name, ticker, status, policyId }: S
 
       {flow === "contribute" && policyId !== undefined && (
         <ContributeButton policyId={policyId} />
+      )}
+
+      {flow === "waiting" && (
+        <div className="rounded-lg border border-alpha-12 bg-gray-200 px-md py-sm text-center">
+          <p className="text-sm text-alpha-60">Waiting for Settlement</p>
+          <p className="mt-xs text-xs text-alpha-40">Your contribution is recorded. Settlement will happen after the subscription window closes.</p>
+        </div>
+      )}
+
+      {flow === "claim" && (
+        <div className="space-y-xs">
+          <p className="text-sm text-neon-glow text-center">
+            {contribution?.outcome === "FullMatch" ? "Full Match" : "Partial Match"} — tokens available!
+          </p>
+          <button
+            onClick={handleClaim}
+            disabled={txPending}
+            className="w-full rounded-lg bg-neon-glow py-2.5 text-sm font-medium text-gray-0 transition-colors enabled:hover:bg-neon-soft disabled:opacity-40"
+          >
+            {txPending ? "Claiming..." : "Claim Tokens"}
+          </button>
+          {contribution?.outcome === "PartialMatch" && !contribution.refund_done && (
+            <button
+              onClick={handleRefund}
+              disabled={txPending}
+              className="w-full rounded-lg border border-gray-500 py-2.5 text-sm font-medium text-gray-1000 hover:bg-alpha-8 transition-colors disabled:opacity-40"
+            >
+              {txPending ? "Refunding..." : "Refund Excess"}
+            </button>
+          )}
+        </div>
+      )}
+
+      {flow === "refund" && (
+        <div className="space-y-xs">
+          <p className="text-sm text-status-refund text-center">No Match — refund available</p>
+          <button
+            onClick={handleRefund}
+            disabled={txPending}
+            className="w-full rounded-lg bg-status-refund py-2.5 text-sm font-medium text-gray-0 transition-colors disabled:opacity-40"
+          >
+            {txPending ? "Refunding..." : "Refund"}
+          </button>
+        </div>
+      )}
+
+      {flow === "done" && (
+        <p className="text-sm text-neon-glow text-center">Done &#x2713;</p>
       )}
     </div>
   );
