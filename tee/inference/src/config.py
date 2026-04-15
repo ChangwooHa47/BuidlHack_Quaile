@@ -17,7 +17,6 @@ class Config:
     policy_registry_account: str = ""
     ido_escrow_account: str = ""
     evm_rpcs_json: str = "{}"
-    skip_ownership_verification: bool = False
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -33,8 +32,6 @@ class Config:
             policy_registry_account=os.getenv("POLICY_REGISTRY_ACCOUNT", ""),
             ido_escrow_account=os.getenv("IDO_ESCROW_ACCOUNT", ""),
             evm_rpcs_json=os.getenv("EVM_RPCS_JSON", "{}"),
-            skip_ownership_verification=os.getenv("SKIP_OWNERSHIP_VERIFICATION", "").lower()
-            in {"1", "true", "yes"},
         )
 
     @property

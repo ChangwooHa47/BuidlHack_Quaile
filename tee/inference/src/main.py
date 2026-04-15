@@ -137,7 +137,7 @@ def create_app(services: AppServices | None = None) -> FastAPI:
                     config.near_rpc_url, config.policy_registry_account
                 ),
                 near_ingestor=NoopNearIngestor(),
-                evm_ingestor=EvmIngestor(EVM_CHAINS),
+                evm_ingestor=EvmIngestor({cid: c for cid, c in EVM_CHAINS.items() if c.rpc}) if any(c.rpc for c in EVM_CHAINS.values()) else NoopEvmIngestor(),
                 github_ingestor=NoopGithubIngestor(),
                 llm_client=NearAIClient(
                     api_key=config.near_ai_api_key,
