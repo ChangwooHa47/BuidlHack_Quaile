@@ -18,8 +18,8 @@ export default function Header() {
           <Link href="/" className="text-sm font-medium text-gray-800 hover:text-gray-1000 transition-colors">
             Project
           </Link>
-          <Link href="/profile" className="text-sm font-medium text-gray-700 hover:text-gray-1000 transition-colors">
-            Profile
+          <Link href="/admin" className="text-sm font-medium text-gray-700 hover:text-gray-1000 transition-colors">
+            Admin
           </Link>
         </nav>
 
