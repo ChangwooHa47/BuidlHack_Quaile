@@ -128,6 +128,7 @@ export default async function ProjectDetailPage({
                 ticker={policy.ticker}
                 status={policy.status}
                 policyId={policy.id}
+                slug={slug}
               />
             </aside>
           </div>
