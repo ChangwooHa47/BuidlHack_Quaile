@@ -64,7 +64,7 @@ echo ""
 echo "=== [4/6] Wiring cross-contract references ==="
 echo "  [call] policy_registry.set_escrow_account($ESCROW_ACCOUNT)"
 near call "$POLICY_REGISTRY_ACCOUNT" set_escrow_account \
-    "{\"escrow_account\": \"$ESCROW_ACCOUNT\"}" \
+    "{\"escrow\": \"$ESCROW_ACCOUNT\"}" \
     --accountId "$OWNER_ACCOUNT"
 
 echo ""

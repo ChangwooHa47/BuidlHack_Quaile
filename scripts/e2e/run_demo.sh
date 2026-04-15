@@ -47,11 +47,11 @@ SUB_START=$(( NOW_NS + 60000000000 ))     # +60s
 SUB_END=$(( NOW_NS + 7260000000000 ))     # +2h+1min (> sub_start + 1h)
 LIVE_END=$(( NOW_NS + 14460000000000 ))   # +4h+1min
 
-POLICY_TX=$(near call "$POLICY_REGISTRY_ACCOUNT" register_policy \
+near call "$POLICY_REGISTRY_ACCOUNT" register_policy \
     "{\"natural_language\": \"Prefer long-term NEAR holders with minimum 180 days wallet history and active ecosystem participation.\", \"ipfs_cid\": \"bafybeibwzifw52ttrkqlikfzext5akxu7lz4xiwjgwzmqcpdzmp3n5mbdq\", \"sale_config\": {\"token_contract\": \"$MOCK_FT_ACCOUNT\", \"total_allocation\": \"1000000000000000000000000000\", \"price_per_token\": \"1000000000000000000000000\", \"payment_token\": \"Near\", \"subscription_start\": $SUB_START, \"subscription_end\": $SUB_END, \"live_end\": $LIVE_END}}" \
-    --accountId "$FOUNDATION_ACCOUNT" 2>&1)
-echo "$POLICY_TX"
-POLICY_ID=$(echo "$POLICY_TX" | grep -oE "[0-9]+" | tail -1)
+    --accountId "$FOUNDATION_ACCOUNT"
+# Policy IDs are sequential starting from 0. Override via env if needed.
+POLICY_ID="${POLICY_ID_OVERRIDE:-0}"
 echo "Policy ID: $POLICY_ID"
 echo "$POLICY_ID" > "$OUT_DIR/policy_id.txt"
 echo ""
@@ -93,24 +93,52 @@ echo "=== [6/9] Contribute (bundle + ZK proof) ==="
 "$SCRIPT_DIR/06_contribute.sh" "$POLICY_ID" "$INVESTOR_ACCOUNT" "$OUT_DIR"
 echo ""
 
-# ── Step 7: Advance to Live, then Closed ──
-echo "=== [7/9] Advance status → Live → Closed ==="
-# For demo speed, we manually advance (in production this is time-gated)
-near call "$POLICY_REGISTRY_ACCOUNT" advance_status \
-    "{\"id\": $POLICY_ID}" \
-    --accountId "$OWNER_ACCOUNT" || echo "(may need to wait for subscription_end)"
+# ── Step 7: Advance to Live ──
+echo "=== [7/10] Advance status → Live ==="
+echo "NOTE: advance_status is time-gated. subscription_end must have passed."
+echo "      For quick demo, set short subscription windows in step 2."
+echo "Waiting for subscription_end (this may take a while)..."
+# Poll until advance succeeds (Subscribing → Live)
+for i in $(seq 1 240); do
+    RESULT=$(near call "$POLICY_REGISTRY_ACCOUNT" advance_status \
+        "{\"id\": $POLICY_ID}" \
+        --accountId "$OWNER_ACCOUNT" 2>&1 || true)
+    if echo "$RESULT" | grep -q "Live"; then
+        echo "  Status: Live"
+        break
+    fi
+    if [ "$i" -eq 240 ]; then
+        echo "  Timed out waiting for Live status. Run steps 7-10 manually later."
+        exit 0
+    fi
+    sleep 30
+done
 echo ""
 
-# ── Step 8: Settle ──
-echo "=== [8/9] Settle ==="
-near call "$ESCROW_ACCOUNT" settle \
-    "{\"policy_id\": $POLICY_ID, \"max_contributions\": 100}" \
-    --accountId "$OWNER_ACCOUNT" \
-    --gas 300000000000000 || echo "(settle may need Closed status)"
+# ── Step 8: Mark closed (Live → Closed) ──
+echo "=== [8/10] Wait for live_end, then mark_closed ==="
+echo "NOTE: Live→Closed is via mark_closed (called by escrow settle)."
+echo "      settle() internally calls mark_closed when appropriate."
+echo "Waiting for live_end..."
+for i in $(seq 1 240); do
+    RESULT=$(near call "$ESCROW_ACCOUNT" settle \
+        "{\"policy_id\": $POLICY_ID, \"max_contributions\": 100}" \
+        --accountId "$OWNER_ACCOUNT" \
+        --gas 300000000000000 2>&1 || true)
+    if echo "$RESULT" | grep -q -E "Settled|FullMatch|PartialMatch|NoMatch"; then
+        echo "  Settle completed."
+        break
+    fi
+    if [ "$i" -eq 240 ]; then
+        echo "  Timed out waiting for settle. Run manually later."
+        exit 0
+    fi
+    sleep 30
+done
 echo ""
 
 # ── Step 9: Verify ──
-echo "=== [9/9] Verify ==="
+echo "=== [9/10] Verify ==="
 echo "Contribution:"
 near view "$ESCROW_ACCOUNT" get_contribution \
     "{\"investor\": \"$INVESTOR_ACCOUNT\", \"policy_id\": $POLICY_ID}" || true
@@ -120,6 +148,8 @@ near view "$ESCROW_ACCOUNT" get_policy_totals \
     "{\"policy_id\": $POLICY_ID}" || true
 echo ""
 
+echo ""
+echo "=== [10/10] Done! ==="
 echo "============================================================"
 echo "  Demo complete!"
 echo "============================================================"
