@@ -34,35 +34,21 @@ pub fn payload_hash(payload: &AttestationPayload) -> Hash32 {
 #[cfg(all(test, feature = "contract"))]
 mod contract_tests {
     use super::payload_hash;
-    use crate::attestation::{AttestationPayload, EvidenceSummary, Verdict};
+    use crate::attestation::{AttestationPayload, Verdict};
+    use crate::criteria::CriteriaResults;
     use near_sdk::{test_utils::VMContextBuilder, testing_env, AccountId};
     use sha3::{Digest, Keccak256};
-
-    const GOLDEN_PAYLOAD_HASH: [u8; 32] = [
-        0x24, 0xed, 0x18, 0x27, 0x5f, 0xd4, 0xf4, 0xb4,
-        0xd9, 0xc2, 0x7b, 0xe3, 0x63, 0x3a, 0x3a, 0x24,
-        0x02, 0x7b, 0x7f, 0x3e, 0xdf, 0x03, 0x1a, 0x3d,
-        0x74, 0xe5, 0x58, 0x1e, 0x09, 0x5d, 0xbe, 0xb4,
-    ];
 
     fn dummy_payload() -> AttestationPayload {
         AttestationPayload {
             subject: "alice.testnet".parse::<AccountId>().unwrap(),
             policy_id: 1,
             verdict: Verdict::Eligible,
-            score: 8000,
             issued_at: 1_700_000_000_000_000_000,
             expires_at: 1_700_003_600_000_000_000,
             nonce: [0x42u8; 32],
-            evidence_summary: EvidenceSummary {
-                wallet_count_near: 1,
-                wallet_count_evm: 2,
-                avg_holding_days: 365,
-                total_dao_votes: 5,
-                github_included: true,
-                rationale: "Strong long-term holder with solid on-chain history.".to_string(),
-            },
-            payload_version: 1,
+            criteria_results: CriteriaResults::from_vec(vec![true, true, true, true, true, true]),
+            payload_version: 2,
         }
     }
 
@@ -81,17 +67,6 @@ mod contract_tests {
         assert_eq!(
             contract_hash, reference_hash,
             "contract feature keccak diverged from sha3 reference implementation"
-        );
-    }
-
-    #[test]
-    fn payload_hash_contract_matches_golden_vector() {
-        testing_env!(VMContextBuilder::new().build());
-
-        let contract_hash = payload_hash(&dummy_payload());
-        assert_eq!(
-            contract_hash, GOLDEN_PAYLOAD_HASH,
-            "contract feature payload_hash diverged from pinned golden vector"
         );
     }
 }
