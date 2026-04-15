@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import StatusBadge from "./StatusBadge";
 import PersonaForm from "./PersonaForm";
 import ContributeButton from "./ContributeButton";
+import IdentityModal from "./IdentityModal";
 import { useWallet } from "@/contexts/WalletContext";
 import { useIdentity } from "@/contexts/IdentityContext";
 import { getContribution, type OnChainContribution } from "@/lib/near/contracts";
@@ -21,10 +22,11 @@ type Flow = "identity" | "persona" | "contribute" | "waiting" | "claim" | "refun
 
 export default function SubscribingSidebar({ name, ticker, status, policyId }: SubscribingSidebarProps) {
   const { selector, isConnected, accountId } = useWallet();
-  const { evmWallets, githubConnected } = useIdentity();
+  const { evmWallets, githubConnected, isIdentityComplete } = useIdentity();
   const [flow, setFlow] = useState<Flow>("identity");
   const [contribution, setContribution] = useState<OnChainContribution | null>(null);
   const [txPending, setTxPending] = useState(false);
+  const [showIdentityModal, setShowIdentityModal] = useState(false);
 
   useEffect(() => {
     if (!accountId || policyId === undefined) return;
@@ -123,16 +125,19 @@ export default function SubscribingSidebar({ name, ticker, status, policyId }: S
       {/* Flow-based CTA */}
       {flow === "identity" && (
         <div className="space-y-xs">
-          <button className="w-full rounded-lg border border-gray-500 py-2.5 text-sm font-medium text-gray-1000 hover:bg-alpha-8 transition-colors">
+          <button
+            onClick={() => setShowIdentityModal(true)}
+            className="w-full rounded-lg border border-gray-500 py-2.5 text-sm font-medium text-gray-1000 hover:bg-alpha-8 transition-colors"
+          >
             Edit Identity
           </button>
           {isSubscribing && policyId !== undefined && (
             <button
-              disabled={!isConnected}
+              disabled={!isIdentityComplete}
               onClick={() => setFlow("persona")}
               className="w-full rounded-lg bg-neon-glow py-2.5 text-sm font-medium text-gray-0 transition-colors enabled:hover:bg-neon-soft disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              Subscribe
+              {isIdentityComplete ? "Subscribe" : "Complete Identity First"}
             </button>
           )}
         </div>
@@ -195,6 +200,13 @@ export default function SubscribingSidebar({ name, ticker, status, policyId }: S
 
       {flow === "done" && (
         <p className="text-sm text-neon-glow text-center">Done &#x2713;</p>
+      )}
+
+      {showIdentityModal && policyId !== undefined && (
+        <IdentityModal
+          policyId={policyId}
+          onClose={() => setShowIdentityModal(false)}
+        />
       )}
     </div>
   );
