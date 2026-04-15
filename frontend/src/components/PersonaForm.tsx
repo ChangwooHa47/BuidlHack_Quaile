@@ -13,8 +13,7 @@ interface PersonaFormProps {
 
 export default function PersonaForm({ policyId, onAttestationComplete }: PersonaFormProps) {
   const { accountId } = useWallet();
-  const { evmWallets } = useIdentity();
-  const [selfIntro, setSelfIntro] = useState("");
+  const { evmWallets, selfIntro } = useIdentity();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,10 +21,6 @@ export default function PersonaForm({ policyId, onAttestationComplete }: Persona
 
   async function handleSubmit() {
     if (!accountId) return;
-    if (!selfIntro.trim()) {
-      setError("Please provide a self-introduction.");
-      return;
-    }
 
     setIsSubmitting(true);
     setError(null);
@@ -43,7 +38,7 @@ export default function PersonaForm({ policyId, onAttestationComplete }: Persona
             chain_id: w.chainId,
             address: w.address,
             signature: w.signature!,
-            message: "",
+            message: w.message || "",
             timestamp: clientTs,
           })),
         },
@@ -54,10 +49,7 @@ export default function PersonaForm({ policyId, onAttestationComplete }: Persona
       };
 
       const response = await submitPersona(persona);
-
-      // Store in sessionStorage for ZK proof + contribute
       sessionStorage.setItem(`attestation_${policyId}`, JSON.stringify(response));
-
       onAttestationComplete(response);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Attestation failed");
@@ -68,18 +60,9 @@ export default function PersonaForm({ policyId, onAttestationComplete }: Persona
 
   return (
     <div className="space-y-md">
-      <div>
-        <label className="mb-xs block text-xs font-medium uppercase tracking-wider text-gray-600">
-          Self Introduction
-        </label>
-        <textarea
-          value={selfIntro}
-          onChange={(e) => setSelfIntro(e.target.value.slice(0, 2000))}
-          placeholder="Describe your experience in the ecosystem..."
-          rows={4}
-          className="w-full rounded-lg border border-border bg-background px-md py-sm text-sm text-gray-1000 placeholder:text-gray-500 focus:border-neon-glow focus:outline-none"
-        />
-        <p className="mt-2xs text-right text-xs text-gray-500">{selfIntro.length}/2000</p>
+      <div className="rounded-lg border border-border bg-background px-md py-sm">
+        <p className="text-xs text-gray-600">Submitting with {signedEvmWallets.length} EVM wallet(s)</p>
+        <p className="mt-xs text-xs text-gray-500 truncate">Intro: {selfIntro.slice(0, 60)}...</p>
       </div>
 
       {error && (
