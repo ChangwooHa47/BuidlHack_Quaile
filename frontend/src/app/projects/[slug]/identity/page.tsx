@@ -118,7 +118,7 @@ export default function IdentityPage() {
           <div className="mt-lg flex items-center gap-md text-xs">
             <span className="text-neon-glow">✓ NEAR</span>
             <span className={hasSignedWallet ? "text-neon-glow" : "text-gray-500"}>
-              {hasSignedWallet ? "✓" : "○"} EVM Wallet
+              {hasSignedWallet ? "✓" : "○"} Wallet
             </span>
             <span className={hasIntro ? "text-neon-glow" : "text-gray-500"}>
               {hasIntro ? "✓" : "○"} Introduction
@@ -145,13 +145,20 @@ export default function IdentityPage() {
               </div>
             </section>
 
-            {/* EVM — Connected Wallets */}
-            {evmWallets.length > 0 && (
-              <section className="rounded-2xl border border-border bg-surface p-xl">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-base font-medium text-gray-1000">Connected Wallets</h2>
+            {/* Wallet Connections */}
+            <section className="rounded-2xl border border-border bg-surface p-xl">
+              <div className="flex items-center justify-between">
+                <h2 className="text-base font-medium text-gray-1000">Wallet Connections</h2>
+                {evmWallets.length > 0 && (
                   <span className="text-xs text-gray-500">{evmWallets.filter((w) => w.signed).length} verified</span>
-                </div>
+                )}
+              </div>
+              <p className="mt-xs text-xs text-gray-500">
+                Connect wallets to prove your on-chain history. More wallets = better evaluation.
+              </p>
+
+              {/* Connected list */}
+              {evmWallets.length > 0 && (
                 <div className="mt-md space-y-xs">
                   {evmWallets.map((w) => (
                     <div key={w.address} className="flex items-center justify-between rounded-xl border border-border bg-background px-lg py-md">
@@ -167,18 +174,9 @@ export default function IdentityPage() {
                       </button>
                     </div>
                   ))}
+                  <div className="h-px bg-border" />
                 </div>
-              </section>
-            )}
-
-            {/* EVM — Add Wallet */}
-            <section className="rounded-2xl border border-border bg-surface p-xl">
-              <h2 className="text-base font-medium text-gray-1000">
-                {evmWallets.length === 0 ? "Connect EVM Wallet" : "Add Another Wallet"}
-              </h2>
-              <p className="mt-xs text-xs text-gray-500">
-                Connect wallets to prove your on-chain history. More wallets = better evaluation.
-              </p>
+              )}
               <div className="mt-md grid grid-cols-2 gap-sm">
                 {INJECTED_WALLETS.map((w) => (
                   <button
