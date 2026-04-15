@@ -16,11 +16,11 @@ const CHAIN_NAMES: Record<number, string> = {
   10: "Optimism", 137: "Polygon", 56: "BSC",
 };
 
-const WALLETS: { id: WalletId; name: string; icon: string }[] = [
+const INJECTED_WALLETS: { id: WalletId; name: string; icon: string }[] = [
   { id: "metamask", name: "MetaMask", icon: "/wallets/metamask.svg" },
   { id: "rabby", name: "Rabby", icon: "/wallets/rabby.svg" },
   { id: "okx", name: "OKX Wallet", icon: "/wallets/okx.svg" },
-  { id: "walletconnect", name: "WalletConnect", icon: "/wallets/walletconnect.svg" },
+  { id: "phantom", name: "Phantom", icon: "/wallets/phantom.svg" },
 ];
 
 export default function IdentityPage() {
@@ -180,7 +180,7 @@ export default function IdentityPage() {
                 Connect wallets to prove your on-chain history. More wallets = better evaluation.
               </p>
               <div className="mt-md grid grid-cols-2 gap-sm">
-                {WALLETS.map((w) => (
+                {INJECTED_WALLETS.map((w) => (
                   <button
                     key={w.id}
                     onClick={() => handleConnect(w.id)}
@@ -194,6 +194,16 @@ export default function IdentityPage() {
                   </button>
                 ))}
               </div>
+              <button
+                onClick={() => handleConnect("walletconnect")}
+                disabled={connecting !== null}
+                className="mt-sm flex w-full items-center justify-center gap-sm rounded-xl border border-border bg-background px-md py-md transition-colors hover:bg-alpha-8 disabled:opacity-40"
+              >
+                <Image src="/wallets/walletconnect.svg" alt="WalletConnect" width={24} height={24} className="rounded-md" />
+                <span className="text-sm font-medium text-gray-1000">
+                  {connecting === "walletconnect" ? "Connecting..." : "WalletConnect"}
+                </span>
+              </button>
               {error && <p className="mt-md rounded-xl bg-status-refund/10 px-lg py-md text-sm text-status-refund">{error}</p>}
             </section>
 

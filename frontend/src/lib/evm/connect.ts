@@ -1,6 +1,6 @@
 import { BrowserProvider, type Eip1193Provider } from "ethers";
 
-export type WalletId = "metamask" | "rabby" | "okx" | "walletconnect";
+export type WalletId = "metamask" | "rabby" | "okx" | "phantom" | "walletconnect";
 
 interface ConnectResult {
   address: string;
@@ -20,6 +20,10 @@ function getInjectedProvider(id: WalletId): Eip1193Provider | null {
 
   if (id === "okx") {
     return w.okxwallet ?? null;
+  }
+
+  if (id === "phantom") {
+    return w.phantom?.ethereum ?? null;
   }
 
   // MetaMask and Rabby both use window.ethereum.
@@ -55,6 +59,7 @@ async function connectInjected(id: WalletId): Promise<ConnectResult> {
       metamask: "MetaMask",
       rabby: "Rabby",
       okx: "OKX Wallet",
+      phantom: "Phantom",
     };
     throw new Error(`${names[id] ?? id} not found. Please install the extension.`);
   }
