@@ -31,7 +31,7 @@ export default function IdentityPage() {
   const {
     evmWallets, addEvmWallet, markEvmSigned, removeEvmWallet,
     selfIntro, setSelfIntro,
-    githubConnected, setGithubConnected,
+    githubConnected, setGithubConnected, setGithubToken,
     isIdentityComplete,
   } = useIdentity();
 
@@ -47,6 +47,19 @@ export default function IdentityPage() {
       if (match) setPolicyId(match.id);
     }).catch(() => {});
   }, [slug]);
+
+  // Check GitHub connection status via HttpOnly cookie
+  useEffect(() => {
+    fetch("/api/auth/github/token")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.connected && data.token) {
+          setGithubToken(data.token);
+          setGithubConnected(true);
+        }
+      })
+      .catch(() => {});
+  }, [setGithubToken, setGithubConnected]);
 
   async function handleConnect(id: WalletId) {
     setConnecting(id);
@@ -145,10 +158,10 @@ export default function IdentityPage() {
               </div>
             </section>
 
-            {/* Wallet Connections */}
+            {/* Connect Wallets */}
             <section className="rounded-2xl border border-border bg-surface p-xl">
               <div className="flex items-center justify-between">
-                <h2 className="text-base font-medium text-gray-1000">Wallet Connections</h2>
+                <h2 className="text-base font-medium text-gray-1000">Connect Wallets</h2>
                 {evmWallets.length > 0 && (
                   <span className="text-xs text-gray-500">{evmWallets.filter((w) => w.signed).length} verified</span>
                 )}
@@ -164,13 +177,10 @@ export default function IdentityPage() {
                     <div key={w.address} className="flex items-center justify-between rounded-xl border border-border bg-background px-lg py-md">
                       <div>
                         <p className="text-sm text-gray-1000">{w.address.slice(0, 6)}...{w.address.slice(-4)}</p>
-                        <p className="text-xs text-gray-500">
-                          {CHAIN_NAMES[w.chainId] || `Chain ${w.chainId}`}
-                          {w.signed && <span className="ml-sm text-neon-glow">Signed ✓</span>}
-                        </p>
+                        {w.signed && <p className="text-xs text-neon-glow">Verified ✓</p>}
                       </div>
-                      <button onClick={() => removeEvmWallet(w.address)} className="rounded-lg p-2 text-gray-500 hover:bg-alpha-8 hover:text-status-refund transition-colors">
-                        &times;
+                      <button onClick={() => removeEvmWallet(w.address)} className="rounded-lg border border-border px-sm py-1 text-xs text-gray-600 hover:bg-status-refund/10 hover:text-status-refund hover:border-status-refund/30 transition-colors">
+                        Remove
                       </button>
                     </div>
                   ))}
@@ -185,7 +195,7 @@ export default function IdentityPage() {
                     disabled={connecting !== null}
                     className="flex items-center gap-sm rounded-xl border border-border bg-background px-md py-md transition-colors hover:bg-alpha-8 disabled:opacity-40"
                   >
-                    <Image src={w.icon} alt={w.name} width={24} height={24} className="rounded-md" />
+                    <span className="flex h-6 w-6 items-center justify-center rounded-md bg-alpha-8 text-[10px] font-medium text-gray-600">{w.name.charAt(0)}</span>
                     <span className="text-sm font-medium text-gray-1000">
                       {connecting === w.id ? "Connecting..." : w.name}
                     </span>
@@ -230,16 +240,16 @@ export default function IdentityPage() {
                   <h2 className="text-base font-medium text-gray-1000">GitHub <span className="font-normal text-gray-500">(optional)</span></h2>
                   <p className="mt-xs text-xs text-gray-500">Include open-source contributions in your evaluation.</p>
                 </div>
-                <button
-                  onClick={() => setGithubConnected(!githubConnected)}
-                  className={`rounded-xl border px-lg py-sm text-sm font-medium transition-colors ${
-                    githubConnected
-                      ? "border-neon-glow/30 bg-neon-glow/5 text-neon-glow"
-                      : "border-border text-gray-700 hover:bg-alpha-8"
-                  }`}
-                >
-                  {githubConnected ? "Connected ✓" : "Connect"}
-                </button>
+                {githubConnected ? (
+                  <span className="text-xs text-neon-glow">Connected ✓</span>
+                ) : (
+                  <a
+                    href={`/api/auth/github?return=/projects/${slug}/identity`}
+                    className="rounded-xl border border-border px-lg py-sm text-sm font-medium text-gray-700 hover:bg-alpha-8 transition-colors"
+                  >
+                    Connect
+                  </a>
+                )}
               </div>
             </section>
 

@@ -21,11 +21,13 @@ interface IdentityContextValue {
   nearAccountId: string | null;
   evmWallets: EvmWalletEntry[];
   githubConnected: boolean;
+  githubToken: string | null;
   selfIntro: string;
   addEvmWallet: (chainId: number, address: string) => void;
   markEvmSigned: (address: string, signature: string, message: string) => void;
   removeEvmWallet: (address: string) => void;
   setGithubConnected: (v: boolean) => void;
+  setGithubToken: (token: string | null) => void;
   setSelfIntro: (v: string) => void;
   reset: () => void;
   isIdentityComplete: boolean;
@@ -35,11 +37,13 @@ const IdentityContext = createContext<IdentityContextValue>({
   nearAccountId: null,
   evmWallets: [],
   githubConnected: false,
+  githubToken: null,
   selfIntro: "",
   addEvmWallet: () => {},
   markEvmSigned: () => {},
   removeEvmWallet: () => {},
   setGithubConnected: () => {},
+  setGithubToken: () => {},
   setSelfIntro: () => {},
   reset: () => {},
   isIdentityComplete: false,
@@ -49,6 +53,7 @@ export function IdentityProvider({ children }: { children: ReactNode }) {
   const { accountId } = useWallet();
   const [evmWallets, setEvmWallets] = useState<EvmWalletEntry[]>([]);
   const [githubConnected, setGithubConnected] = useState(false);
+  const [githubToken, setGithubToken] = useState<string | null>(null);
   const [selfIntro, setSelfIntro] = useState("");
 
   const addEvmWallet = useCallback((chainId: number, address: string) => {
@@ -77,6 +82,7 @@ export function IdentityProvider({ children }: { children: ReactNode }) {
   const reset = useCallback(() => {
     setEvmWallets([]);
     setGithubConnected(false);
+    setGithubToken(null);
     setSelfIntro("");
   }, []);
 
@@ -89,11 +95,13 @@ export function IdentityProvider({ children }: { children: ReactNode }) {
         nearAccountId: accountId,
         evmWallets,
         githubConnected,
+        githubToken,
         selfIntro,
         addEvmWallet,
         markEvmSigned,
         removeEvmWallet,
         setGithubConnected,
+        setGithubToken,
         setSelfIntro,
         reset,
         isIdentityComplete,

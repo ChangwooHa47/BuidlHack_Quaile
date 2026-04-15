@@ -67,11 +67,15 @@ async function connectInjected(id: WalletId): Promise<ConnectResult> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const raw = injected as any;
 
-  // Force account picker
-  await raw.request({
-    method: "wallet_requestPermissions",
-    params: [{ eth_accounts: {} }],
-  });
+  // Force account picker — fall back to eth_requestAccounts if unsupported
+  try {
+    await raw.request({
+      method: "wallet_requestPermissions",
+      params: [{ eth_accounts: {} }],
+    });
+  } catch {
+    await raw.request({ method: "eth_requestAccounts" });
+  }
 
   const provider = new BrowserProvider(injected);
   const signer = await provider.getSigner();
