@@ -48,7 +48,7 @@ SUB_END=$(( NOW_NS + 7260000000000 ))     # +2h+1min (> sub_start + 1h)
 LIVE_END=$(( NOW_NS + 14460000000000 ))   # +4h+1min
 
 near call "$POLICY_REGISTRY_ACCOUNT" register_policy \
-    "{\"natural_language\": \"Prefer long-term NEAR holders with minimum 180 days wallet history and active ecosystem participation.\", \"ipfs_cid\": \"bafybeibwzifw52ttrkqlikfzext5akxu7lz4xiwjgwzmqcpdzmp3n5mbdq\", \"sale_config\": {\"token_contract\": \"$MOCK_FT_ACCOUNT\", \"total_allocation\": \"1000000000000000000000000000\", \"price_per_token\": \"1000000000000000000000000\", \"payment_token\": \"Near\", \"subscription_start\": $SUB_START, \"subscription_end\": $SUB_END, \"live_end\": $LIVE_END}}" \
+    "{\"name\": \"E2E Test Project\", \"ticker\": \"E2E\", \"description\": \"End-to-end test policy for demo validation.\", \"chain\": \"NEAR\", \"logo_url\": \"https://placehold.co/128\", \"natural_language\": \"Evaluation criteria for this IDO: 1. Investor must have held tokens for at least 90 days on any chain 2. Must have participated in DAO governance voting at least 3 times 3. Must have on-chain activity on 2 or more chains (NEAR + EVM) 4. Wallet age must exceed 180 days 5. Self introduction must demonstrate genuine DeFi or blockchain experience\", \"ipfs_cid\": \"bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3ocirgf5de2yjvei\", \"sale_config\": {\"token_contract\": \"$MOCK_FT_ACCOUNT\", \"total_allocation\": \"1000000000000000000000000000\", \"price_per_token\": \"1000000000000000000000000\", \"payment_token\": \"Near\", \"subscription_start\": $SUB_START, \"subscription_end\": $SUB_END, \"live_end\": $LIVE_END}}" \
     --accountId "$FOUNDATION_ACCOUNT"
 # Policy IDs are sequential starting from 0. Override via env if needed.
 POLICY_ID="${POLICY_ID_OVERRIDE:-0}"
