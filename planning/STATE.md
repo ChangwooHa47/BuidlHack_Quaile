@@ -7,16 +7,18 @@
 
 ## Current Iteration
 
-- **Iteration**: 1 ✓ / 2 ✓ / 3 ✓ / 4 ✓ / 5 (ZK) ✓ / **6 (Staging 준비) — IN PROGRESS**
-- **Phase**: implementation — BE 마무리 + FE 연동 + Staging 배포
+- **Iteration**: 1 ✓ / 2 ✓ / 3 ✓ / 4 ✓ / 5 (ZK) ✓ / 6 (Phase A+B) ✓ / **7 (이슈 정리) — IN PROGRESS**
+- **Phase**: implementation — GitHub 이슈 #6, #7, #8, #9 처리
 - **Last Updated**: 2026-04-15
-- **Mode**: Dev Agent 실행 대기 (Phase A: BE, Phase B: FE — 병렬 가능)
+- **Mode**: Dev Agent 실행 대기
 
-## 🎯 STAGING 배포 준비
+## 🎯 남은 이슈 처리
 
-ZK 마이그레이션(zk-01~09) 완료. 이제 BE 마무리 + FE 연동 + Staging 배포.
+Phase A(BE), Phase B(FE 연동) 완료. 남은 GitHub 이슈 4개 처리 후 Staging.
 
-**설계 문서**: `docs/superpowers/plans/2026-04-15-zk-eligibility-migration.md`
+**이슈 상태:**
+- #5 — ✅ CLOSED (sidebar flow로 구현됨)
+- #3 — 로드맵 (이번 스코프 아님)
 
 ### 완료된 태스크 (Phase 1~5)
 
@@ -60,33 +62,36 @@ ZK 마이그레이션(zk-01~09) 완료. 이제 BE 마무리 + FE 연동 + Stagin
 - 태스크 완료 후 코드리뷰 체크포인트 수행 (각 태스크 파일 하단 참조)
 - 태스크 status: `todo` → `in_progress` → `done`
 
-### Phase A — BE 마무리 (순차)
+### Phase A — BE 마무리 ✅ DONE (PR #2)
 
-| # | ID | 태스크 | 상태 | 비고 |
-|---|---|---|---|---|
-| 1 | tee-05 | signer + report | **done** | 이미 구현됨 (crypto.py, pipeline.py) |
-| 2 | tee-06 | key bootstrap | todo | TEE signing key 생성/등록 스크립트 |
-| 3 | infra-02 | testnet deploy (v2) | todo | 5개 컨트랙트 배포 + CORS |
-| 4 | test-01 | e2e demo (v2) | todo | ZK proof 포함 전체 시연 |
-
-### Phase B — FE 연동 (순차, Phase A와 병렬 가능)
-
-| # | ID | 태스크 | 상태 | 비고 |
-|---|---|---|---|---|
-| 1 | fe-01 | 컨트랙트 RPC 레이어 | todo | mock → 실제 Policy 조회 |
-| 2 | fe-02 | Persona 제출 플로우 | todo | 지갑 서명 + TEE 호출 |
-| 3 | fe-03 | ZK proof 생성 (브라우저) | todo | snarkjs + circuit 산출물 |
-| 4 | fe-04 | Contribute 플로우 | todo | bundle + ZK proof → ido-escrow |
-| 5 | fe-05 | 재단 컨트랙트 연동 | todo | register_policy, settle 등 |
-
-### Phase C — Staging 배포
-
-| # | 항목 | 의존 |
+| # | ID | 상태 |
 |---|---|---|
-| 1 | testnet 컨트랙트 배포 (infra-02) | Phase A |
-| 2 | TEE 서비스 배포 (Docker) | Phase A |
-| 3 | Vercel staging 배포 | Phase B |
-| 4 | e2e 테스트 (test-01) | Phase A + B + C.1~3 |
+| 1 | tee-05 | done |
+| 2 | tee-06 | done |
+| 3 | infra-02 | done |
+| 4 | test-01 | done |
+
+### Phase B — FE 연동 ✅ DONE (PR #4, #10)
+
+| # | ID | 상태 |
+|---|---|---|
+| 1 | fe-01 | done |
+| 2 | fe-02 | done |
+| 3 | fe-03 | done |
+| 4 | fe-04 | done |
+| 5 | fe-05 | done |
+
+### 남은 GitHub 이슈 (Staging 전 처리)
+
+| # | 이슈 | 내용 | 크기 |
+|---|---|---|---|
+| #8 | 코드 정리 | `/profile` 깨진 링크 제거 | 소 |
+| #6 | Admin 재설계 | 라우트 변경 + Criteria 플로우 + Phase 권한 + `/v1/structurize` | 대 |
+| #7 | Admin UX | 사이드바, breadcrumb, Phase 인디케이터 | 중 |
+| #9 | 투자자 상세 | External Criteria + Claim/Refund 버튼 | 중 |
+
+**실행 순서:** #8 → #6 → #7 → #9
+(#6이 가장 크고, #7은 #6 라우트 변경 위에 얹는 거, #9는 #6의 External criteria 구조 필요)
 
 ### Superseded 태스크
 | ID | 태스크 | 대체 |

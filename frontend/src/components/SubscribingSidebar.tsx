@@ -56,7 +56,12 @@ export default function SubscribingSidebar({ name, ticker, status, policyId }: S
     try {
       const wallet = await selector.wallet("my-near-wallet");
       await claim(wallet, policyId);
-      setFlow("done");
+      // PartialMatch: still need to refund after claiming
+      if (contribution?.outcome === "PartialMatch") {
+        setFlow("refund");
+      } else {
+        setFlow("done");
+      }
     } catch { /* ignore */ }
     setTxPending(false);
   }

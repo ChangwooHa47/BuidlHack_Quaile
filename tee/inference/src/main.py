@@ -177,11 +177,13 @@ def create_app(services: AppServices | None = None) -> FastAPI:
         nl = body.get("natural_language", "")
         if not nl or len(nl) < 10:
             raise HTTPException(status_code=400, detail="natural_language too short")
+        if len(nl) > 2000:
+            raise HTTPException(status_code=400, detail="natural_language too long (max 2000)")
         try:
             rules = await app.state.services.deps.llm_client.structurize(nl)
             return {"criteria": rules.criteria, "qualitative_prompt": rules.qualitative_prompt}
-        except Exception as exc:
-            raise HTTPException(status_code=500, detail=str(exc)) from exc
+        except Exception:
+            raise HTTPException(status_code=500, detail="LLM structurize failed")
 
     @app.post("/v1/attest", response_model=AttestationResponseModel)
     async def attest(persona: PersonaSubmission) -> AttestationResponseModel:
