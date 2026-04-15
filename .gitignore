@@ -6,6 +6,7 @@ planning/figma-refs/
 # Rust
 /target/
 *.wasm
+!frontend/public/zk/*.wasm
 
 # Python
 __pycache__/

@@ -61,6 +61,11 @@ fn policy_roundtrip() {
     let policy = Policy {
         id: 42,
         foundation: "foundation.testnet".to_string(),
+        name: "Test Project".to_string(),
+        ticker: "TST".to_string(),
+        description: "A test project for roundtrip testing.".to_string(),
+        chain: "NEAR".to_string(),
+        logo_url: "https://placehold.co/128".to_string(),
         natural_language: "Prefer long-term NEAR holders with DeFi experience.".to_string(),
         ipfs_cid: "bafybeibwzifw52ttrkqlikfzext5akxu7lz4xiwjgwzmqcpdzmp3n5mbdq".to_string(),
         sale_config: dummy_sale_config(),

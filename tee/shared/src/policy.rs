@@ -20,6 +20,16 @@ pub type PolicyId = u64;
 pub struct Policy {
     pub id: PolicyId,
     pub foundation: AccountId,
+    /// Project display name (e.g. "Walrus").
+    pub name: String,
+    /// Token ticker symbol (e.g. "W").
+    pub ticker: String,
+    /// Short project description for card/hero display.
+    pub description: String,
+    /// Primary chain of the project (e.g. "SUI", "NEAR", "SOL").
+    pub chain: String,
+    /// Logo URL for project avatar (placeholder or IPFS gateway URL).
+    pub logo_url: String,
     /// Full natural-language selection criteria (also backed to IPFS).
     pub natural_language: String,
     /// IPFS CID of the policy document (e.g. "bafybeib...").

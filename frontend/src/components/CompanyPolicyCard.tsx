@@ -1,8 +1,8 @@
 import Link from "next/link";
 import StatusBadge from "./StatusBadge";
-import type { PolicyData } from "@/lib/mock/policies";
+import type { OnChainPolicy } from "@/lib/near/contracts";
 
-export default function CompanyPolicyCard({ policy }: { policy: PolicyData }) {
+export default function CompanyPolicyCard({ policy }: { policy: OnChainPolicy }) {
   const title = policy.natural_language.length > 60
     ? policy.natural_language.slice(0, 60) + "..."
     : policy.natural_language;
@@ -45,21 +45,7 @@ export default function CompanyPolicyCard({ policy }: { policy: PolicyData }) {
       <div className="relative z-10 space-y-[10px]">
         <Row label="Allocation" value={`${alloc} tokens`} />
         <Row label="Period" value={`${startDate} — ${endDate}`} />
-        {policy.subscribers != null && <Row label="Subscribers" value={policy.subscribers.toLocaleString()} />}
-        {policy.progress != null && (
-          <div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-alpha-40">Progress</span>
-              <span className="font-medium text-neon-glow">{policy.progress.toLocaleString()}%</span>
-            </div>
-            <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-alpha-12">
-              <div
-                className="h-full rounded-full bg-neon-glow transition-all"
-                style={{ width: `${Math.min(policy.progress, 100)}%` }}
-              />
-            </div>
-          </div>
-        )}
+        <Row label="Status" value={policy.status} />
       </div>
     </Link>
   );

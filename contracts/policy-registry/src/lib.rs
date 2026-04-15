@@ -108,6 +108,11 @@ impl PolicyRegistry {
     /// Foundation only: register a new policy.
     pub fn register_policy(
         &mut self,
+        name: String,
+        ticker: String,
+        description: String,
+        chain: String,
+        logo_url: String,
         natural_language: String,
         ipfs_cid: String,
         sale_config: SaleConfig,
@@ -174,6 +179,11 @@ impl PolicyRegistry {
         let policy = Policy {
             id,
             foundation: predecessor.clone(),
+            name,
+            ticker,
+            description,
+            chain,
+            logo_url,
             natural_language,
             ipfs_cid: ipfs_cid.clone(),
             sale_config: sale_config.clone(),
