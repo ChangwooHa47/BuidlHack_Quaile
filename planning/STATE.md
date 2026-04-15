@@ -7,16 +7,14 @@
 
 ## Current Iteration
 
-- **Iteration**: 1 ✓ / 2 ✓ / 3 ✓ / 4 ✓ / **5 (ZK migration) — IN PROGRESS**
-- **Phase**: implementation — ZK eligibility migration
+- **Iteration**: 1 ✓ / 2 ✓ / 3 ✓ / 4 ✓ / 5 (ZK) ✓ / **6 (Staging 준비) — IN PROGRESS**
+- **Phase**: implementation — BE 마무리 + FE 연동 + Staging 배포
 - **Last Updated**: 2026-04-15
-- **Mode**: Dev Agent 실행 대기
+- **Mode**: Dev Agent 실행 대기 (Phase A: BE, Phase B: FE — 병렬 가능)
 
-## 🎯 ZK ELIGIBILITY MIGRATION
+## 🎯 STAGING 배포 준비
 
-**아키텍처 변경**: TEE score+evidence → 항목별 pass/fail + circom groth16 ZK proof
-
-기존 Phase 1~5 태스크는 `done` 상태. 아래 ZK 태스크가 신규 구현 대상.
+ZK 마이그레이션(zk-01~09) 완료. 이제 BE 마무리 + FE 연동 + Staging 배포.
 
 **설계 문서**: `docs/superpowers/plans/2026-04-15-zk-eligibility-migration.md`
 
@@ -62,16 +60,39 @@
 - 태스크 완료 후 코드리뷰 체크포인트 수행 (각 태스크 파일 하단 참조)
 - 태스크 status: `todo` → `in_progress` → `done`
 
-### 남은 기존 태스크 (ZK 완료 후)
+### Phase A — BE 마무리 (순차)
 
-| ID | 태스크 | 상태 | 비고 |
-|---|---|---|---|
-| tee-04 | llm-judge | superseded | zk-06으로 대체 |
-| tee-05 | signer-and-report | todo | TEE 서명 + TDX report — ZK와 독립 |
-| tee-06 | key-bootstrap | todo | TEE signing key 생성/배포 |
-| test-02 | cross-lang-borsh | superseded | zk-08로 대체 |
-| infra-02 | testnet-deploy | todo | |
-| test-01 | e2e-demo | todo | |
+| # | ID | 태스크 | 상태 | 비고 |
+|---|---|---|---|---|
+| 1 | tee-05 | signer + report | **done** | 이미 구현됨 (crypto.py, pipeline.py) |
+| 2 | tee-06 | key bootstrap | todo | TEE signing key 생성/등록 스크립트 |
+| 3 | infra-02 | testnet deploy (v2) | todo | 5개 컨트랙트 배포 + CORS |
+| 4 | test-01 | e2e demo (v2) | todo | ZK proof 포함 전체 시연 |
+
+### Phase B — FE 연동 (순차, Phase A와 병렬 가능)
+
+| # | ID | 태스크 | 상태 | 비고 |
+|---|---|---|---|---|
+| 1 | fe-01 | 컨트랙트 RPC 레이어 | todo | mock → 실제 Policy 조회 |
+| 2 | fe-02 | Persona 제출 플로우 | todo | 지갑 서명 + TEE 호출 |
+| 3 | fe-03 | ZK proof 생성 (브라우저) | todo | snarkjs + circuit 산출물 |
+| 4 | fe-04 | Contribute 플로우 | todo | bundle + ZK proof → ido-escrow |
+| 5 | fe-05 | 재단 컨트랙트 연동 | todo | register_policy, settle 등 |
+
+### Phase C — Staging 배포
+
+| # | 항목 | 의존 |
+|---|---|---|
+| 1 | testnet 컨트랙트 배포 (infra-02) | Phase A |
+| 2 | TEE 서비스 배포 (Docker) | Phase A |
+| 3 | Vercel staging 배포 | Phase B |
+| 4 | e2e 테스트 (test-01) | Phase A + B + C.1~3 |
+
+### Superseded 태스크
+| ID | 태스크 | 대체 |
+|---|---|---|
+| tee-04 | llm-judge | zk-06 |
+| test-02 | cross-lang-borsh | zk-08 |
 
 **알려진 deferred items** (구현 중 필요 시 해결):
 - ~~TDX `report_data` 정확한 인코딩~~ ✅ **iteration 4에서 CLOSED**

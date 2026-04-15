@@ -1,6 +1,6 @@
 ---
 id: tee-06-key-bootstrap
-status: todo
+status: done
 sub: TEE
 layer: tee
 depends_on: [tee-05-signer-and-report]
