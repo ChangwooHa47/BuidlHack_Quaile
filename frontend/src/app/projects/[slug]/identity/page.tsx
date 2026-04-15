@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import Header from "@/components/Header";
 import { useWallet } from "@/contexts/WalletContext";
 import { useIdentity } from "@/contexts/IdentityContext";
-import { connectEvmWallet, type WalletMethod } from "@/lib/evm/connect";
+import { connectEvmWallet, type WalletId } from "@/lib/evm/connect";
 import { buildCanonicalMessage, generateNonce, nowNs, SUPPORTED_CHAINS } from "@/lib/evm/message";
 import { getAllPolicies } from "@/lib/near/contracts";
 
@@ -14,6 +15,13 @@ const CHAIN_NAMES: Record<number, string> = {
   1: "Ethereum", 8453: "Base", 42161: "Arbitrum",
   10: "Optimism", 137: "Polygon", 56: "BSC",
 };
+
+const WALLETS: { id: WalletId; name: string; icon: string }[] = [
+  { id: "metamask", name: "MetaMask", icon: "/wallets/metamask.svg" },
+  { id: "rabby", name: "Rabby", icon: "/wallets/rabby.svg" },
+  { id: "okx", name: "OKX Wallet", icon: "/wallets/okx.svg" },
+  { id: "walletconnect", name: "WalletConnect", icon: "/wallets/walletconnect.svg" },
+];
 
 export default function IdentityPage() {
   const params = useParams();
@@ -27,7 +35,7 @@ export default function IdentityPage() {
     isIdentityComplete,
   } = useIdentity();
 
-  const [connecting, setConnecting] = useState<WalletMethod | null>(null);
+  const [connecting, setConnecting] = useState<WalletId | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [policyId, setPolicyId] = useState<number>(0);
 
@@ -40,11 +48,11 @@ export default function IdentityPage() {
     }).catch(() => {});
   }, [slug]);
 
-  async function handleAddWallet(method: WalletMethod) {
-    setConnecting(method);
+  async function handleConnect(id: WalletId) {
+    setConnecting(id);
     setError(null);
     try {
-      const { address, chainId, sign } = await connectEvmWallet(method);
+      const { address, chainId, sign } = await connectEvmWallet(id);
 
       if (!SUPPORTED_CHAINS[chainId]) {
         setError(`Chain ${chainId} not supported. Switch to Ethereum, Base, Arbitrum, Optimism, Polygon, or BSC.`);
@@ -52,13 +60,11 @@ export default function IdentityPage() {
         return;
       }
 
-      // Sign ownership message
       const nonce = generateNonce();
       const ts = nowNs();
       const message = buildCanonicalMessage(policyId, nonce, ts, chainId, address);
       const signature = await sign(message);
 
-      // Store
       addEvmWallet(chainId, address);
       markEvmSigned(address, signature, message);
     } catch (err) {
@@ -69,10 +75,6 @@ export default function IdentityPage() {
     } finally {
       setConnecting(null);
     }
-  }
-
-  function handleSave() {
-    router.push(`/projects/${slug}`);
   }
 
   const hasSignedWallet = evmWallets.some((w) => w.signed);
@@ -106,7 +108,6 @@ export default function IdentityPage() {
 
           <h1 className="text-2xl font-semibold text-gray-1000">Build Your Persona</h1>
 
-          {/* Privacy */}
           <div className="mt-md rounded-2xl border border-neon-glow/20 bg-neon-glow/5 px-xl py-md">
             <p className="text-sm text-neon-glow font-medium">Privacy Guarantee</p>
             <p className="mt-xs text-xs text-gray-600">
@@ -114,7 +115,6 @@ export default function IdentityPage() {
             </p>
           </div>
 
-          {/* Progress */}
           <div className="mt-lg flex items-center gap-md text-xs">
             <span className="text-neon-glow">✓ NEAR</span>
             <span className={hasSignedWallet ? "text-neon-glow" : "text-gray-500"}>
@@ -130,7 +130,7 @@ export default function IdentityPage() {
 
           <div className="mt-xl space-y-xl">
 
-            {/* ── NEAR Wallet ── */}
+            {/* NEAR */}
             <section className="rounded-2xl border border-border bg-surface p-xl">
               <div className="flex items-center justify-between">
                 <h2 className="text-base font-medium text-gray-1000">NEAR Wallet</h2>
@@ -145,18 +145,13 @@ export default function IdentityPage() {
               </div>
             </section>
 
-            {/* ── EVM Wallets ── */}
-            <section className="rounded-2xl border border-border bg-surface p-xl">
-              <div className="flex items-center justify-between">
-                <h2 className="text-base font-medium text-gray-1000">EVM Wallets</h2>
-                <span className="text-xs text-gray-500">{evmWallets.filter((w) => w.signed).length} verified</span>
-              </div>
-              <p className="mt-xs text-xs text-gray-500">
-                Connect wallets to prove your on-chain history. More wallets = better evaluation.
-              </p>
-
-              {/* Connected wallets */}
-              {evmWallets.length > 0 && (
+            {/* EVM — Connected Wallets */}
+            {evmWallets.length > 0 && (
+              <section className="rounded-2xl border border-border bg-surface p-xl">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-base font-medium text-gray-1000">Connected Wallets</h2>
+                  <span className="text-xs text-gray-500">{evmWallets.filter((w) => w.signed).length} verified</span>
+                </div>
                 <div className="mt-md space-y-xs">
                   {evmWallets.map((w) => (
                     <div key={w.address} className="flex items-center justify-between rounded-xl border border-border bg-background px-lg py-md">
@@ -173,34 +168,36 @@ export default function IdentityPage() {
                     </div>
                   ))}
                 </div>
-              )}
+              </section>
+            )}
 
-              {/* Connect buttons */}
-              <div className="mt-md flex gap-sm">
-                <button
-                  onClick={() => handleAddWallet("injected")}
-                  disabled={connecting !== null}
-                  className="flex-1 rounded-xl border border-border bg-background px-md py-md text-center transition-colors hover:bg-alpha-8 disabled:opacity-40"
-                >
-                  <p className="text-sm font-medium text-gray-1000">Browser Wallet</p>
-                  <p className="mt-2xs text-[11px] text-gray-500">MetaMask, Rabby, etc.</p>
-                  {connecting === "injected" && <p className="mt-xs text-[11px] text-neon-glow animate-pulse">Connecting...</p>}
-                </button>
-                <button
-                  onClick={() => handleAddWallet("walletconnect")}
-                  disabled={connecting !== null}
-                  className="flex-1 rounded-xl border border-border bg-background px-md py-md text-center transition-colors hover:bg-alpha-8 disabled:opacity-40"
-                >
-                  <p className="text-sm font-medium text-gray-1000">WalletConnect</p>
-                  <p className="mt-2xs text-[11px] text-gray-500">QR code / mobile</p>
-                  {connecting === "walletconnect" && <p className="mt-xs text-[11px] text-neon-glow animate-pulse">Connecting...</p>}
-                </button>
+            {/* EVM — Add Wallet */}
+            <section className="rounded-2xl border border-border bg-surface p-xl">
+              <h2 className="text-base font-medium text-gray-1000">
+                {evmWallets.length === 0 ? "Connect EVM Wallet" : "Add Another Wallet"}
+              </h2>
+              <p className="mt-xs text-xs text-gray-500">
+                Connect wallets to prove your on-chain history. More wallets = better evaluation.
+              </p>
+              <div className="mt-md grid grid-cols-2 gap-sm">
+                {WALLETS.map((w) => (
+                  <button
+                    key={w.id}
+                    onClick={() => handleConnect(w.id)}
+                    disabled={connecting !== null}
+                    className="flex items-center gap-sm rounded-xl border border-border bg-background px-md py-md transition-colors hover:bg-alpha-8 disabled:opacity-40"
+                  >
+                    <Image src={w.icon} alt={w.name} width={24} height={24} className="rounded-md" />
+                    <span className="text-sm font-medium text-gray-1000">
+                      {connecting === w.id ? "Connecting..." : w.name}
+                    </span>
+                  </button>
+                ))}
               </div>
-
               {error && <p className="mt-md rounded-xl bg-status-refund/10 px-lg py-md text-sm text-status-refund">{error}</p>}
             </section>
 
-            {/* ── Self Introduction ── */}
+            {/* Self Introduction */}
             <section className="rounded-2xl border border-border bg-surface p-xl">
               <div className="flex items-center justify-between">
                 <h2 className="text-base font-medium text-gray-1000">Self Introduction</h2>
@@ -218,7 +215,7 @@ export default function IdentityPage() {
               />
             </section>
 
-            {/* ── GitHub ── */}
+            {/* GitHub */}
             <section className="rounded-2xl border border-border bg-surface p-xl">
               <div className="flex items-center justify-between">
                 <div>
@@ -238,9 +235,9 @@ export default function IdentityPage() {
               </div>
             </section>
 
-            {/* ── Save ── */}
+            {/* Save */}
             <button
-              onClick={handleSave}
+              onClick={() => router.push(`/projects/${slug}`)}
               className="w-full rounded-xl bg-neon-glow py-md text-sm font-medium text-gray-0 transition-colors hover:bg-neon-soft"
             >
               Save

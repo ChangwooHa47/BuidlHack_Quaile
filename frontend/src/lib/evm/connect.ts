@@ -1,6 +1,6 @@
-import { BrowserProvider } from "ethers";
+import { BrowserProvider, type Eip1193Provider } from "ethers";
 
-export type WalletMethod = "injected" | "walletconnect";
+export type WalletId = "metamask" | "rabby" | "okx" | "walletconnect";
 
 interface ConnectResult {
   address: string;
@@ -9,21 +9,66 @@ interface ConnectResult {
 }
 
 /**
- * Connect via injected provider (MetaMask, Rabby, Rainbow, etc.)
- * Uses wallet_requestPermissions to force account picker every time.
+ * Find a specific injected provider.
+ * Handles the case where multiple wallets inject into window.ethereum.
  */
-async function connectInjected(): Promise<ConnectResult> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const eth = (window as any).ethereum;
-  if (!eth) throw new Error("No browser wallet found. Install MetaMask or similar.");
+function getInjectedProvider(id: WalletId): Eip1193Provider | null {
+  if (typeof window === "undefined") return null;
 
-  // Force account picker — revokes cached permission and re-prompts
-  await eth.request({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const w = window as any;
+
+  if (id === "okx") {
+    return w.okxwallet ?? null;
+  }
+
+  // MetaMask and Rabby both use window.ethereum.
+  // If multiple wallets are installed, window.ethereum.providers may exist.
+  const providers: Eip1193Provider[] = w.ethereum?.providers ?? [w.ethereum].filter(Boolean);
+
+  for (const p of providers) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const provider = p as any;
+    if (id === "metamask" && provider.isMetaMask && !provider.isRabby) return provider;
+    if (id === "rabby" && provider.isRabby) return provider;
+  }
+
+  // Fallback: if only one provider and it matches loosely
+  if (w.ethereum) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const eth = w.ethereum as any;
+    if (id === "metamask" && eth.isMetaMask) return eth;
+    if (id === "rabby" && eth.isRabby) return eth;
+  }
+
+  return null;
+}
+
+/**
+ * Connect via an injected browser wallet (MetaMask, Rabby, OKX).
+ * wallet_requestPermissions forces account picker every time.
+ */
+async function connectInjected(id: WalletId): Promise<ConnectResult> {
+  const injected = getInjectedProvider(id);
+  if (!injected) {
+    const names: Record<string, string> = {
+      metamask: "MetaMask",
+      rabby: "Rabby",
+      okx: "OKX Wallet",
+    };
+    throw new Error(`${names[id] ?? id} not found. Please install the extension.`);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const raw = injected as any;
+
+  // Force account picker
+  await raw.request({
     method: "wallet_requestPermissions",
     params: [{ eth_accounts: {} }],
   });
 
-  const provider = new BrowserProvider(eth);
+  const provider = new BrowserProvider(injected);
   const signer = await provider.getSigner();
   const address = (await signer.getAddress()).toLowerCase();
   const network = await provider.getNetwork();
@@ -37,13 +82,13 @@ async function connectInjected(): Promise<ConnectResult> {
 
 /**
  * Connect via WalletConnect QR code.
- * Creates a fresh provider each time — no session reuse.
+ * Fresh provider each time — no session reuse.
  */
 async function connectWalletConnect(): Promise<ConnectResult> {
   const { EthereumProvider } = await import("@walletconnect/ethereum-provider");
   const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "";
   if (!projectId || projectId === "PLACEHOLDER") {
-    throw new Error("WalletConnect project ID not configured");
+    throw new Error("WalletConnect not configured. Set NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID.");
   }
 
   const wc = await EthereumProvider.init({
@@ -72,11 +117,9 @@ async function connectWalletConnect(): Promise<ConnectResult> {
 }
 
 /**
- * Connect a wallet and return address + chainId + sign function.
+ * Connect a wallet by ID. Returns address, chainId, and a sign function.
  */
-export async function connectEvmWallet(method: WalletMethod): Promise<ConnectResult> {
-  switch (method) {
-    case "injected": return connectInjected();
-    case "walletconnect": return connectWalletConnect();
-  }
+export async function connectEvmWallet(id: WalletId): Promise<ConnectResult> {
+  if (id === "walletconnect") return connectWalletConnect();
+  return connectInjected(id);
 }
