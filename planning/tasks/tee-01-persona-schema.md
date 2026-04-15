@@ -1,6 +1,6 @@
 ---
 id: tee-01-persona-schema
-status: todo
+status: done
 sub: TEE
 layer: tee
 depends_on: []

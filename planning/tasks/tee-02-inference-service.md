@@ -1,6 +1,6 @@
 ---
 id: tee-02-inference-service
-status: todo
+status: done
 sub: TEE
 layer: tee
 depends_on: [tee-01-persona-schema]

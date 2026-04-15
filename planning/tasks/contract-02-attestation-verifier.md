@@ -1,6 +1,6 @@
 ---
 id: contract-02-attestation-verifier
-status: todo
+status: done
 sub: BE
 layer: contract
 depends_on: [infra-01-monorepo-init, tee-01-persona-schema]

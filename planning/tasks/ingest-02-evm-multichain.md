@@ -1,6 +1,6 @@
 ---
 id: ingest-02-evm-multichain
-status: todo
+status: done
 sub: TEE
 layer: ingest
 depends_on: [tee-01-persona-schema, tee-02-inference-service]

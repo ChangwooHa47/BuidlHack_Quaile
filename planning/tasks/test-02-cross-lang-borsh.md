@@ -1,6 +1,6 @@
 ---
 id: test-02-cross-lang-borsh
-status: todo
+status: superseded
 sub: INFRA
 layer: test
 depends_on: [tee-01-persona-schema, tee-05-signer-and-report]

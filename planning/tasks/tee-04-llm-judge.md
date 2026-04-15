@@ -1,6 +1,6 @@
 ---
 id: tee-04-llm-judge
-status: todo
+status: superseded
 sub: TEE
 layer: tee
 depends_on: [tee-02-inference-service, tee-03-ownership-verification, ingest-01-near-rpc, ingest-02-evm-multichain, ingest-03-github]
