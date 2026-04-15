@@ -61,6 +61,11 @@ export interface SaleConfigArgs {
 
 export async function registerPolicy(
   wallet: Wallet,
+  name: string,
+  ticker: string,
+  description: string,
+  chain: string,
+  logoUrl: string,
   naturalLanguage: string,
   ipfsCid: string,
   saleConfig: SaleConfigArgs,
@@ -73,6 +78,11 @@ export async function registerPolicy(
         params: {
           methodName: "register_policy",
           args: {
+            name,
+            ticker,
+            description,
+            chain,
+            logo_url: logoUrl,
             natural_language: naturalLanguage,
             ipfs_cid: ipfsCid,
             sale_config: saleConfig,

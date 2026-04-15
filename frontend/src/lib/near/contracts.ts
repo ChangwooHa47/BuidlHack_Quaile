@@ -5,6 +5,11 @@ import { viewCall } from "./rpc";
 export interface OnChainPolicy {
   id: number;
   foundation: string;
+  name: string;
+  ticker: string;
+  description: string;
+  chain: string;
+  logo_url: string;
   natural_language: string;
   ipfs_cid: string;
   sale_config: {

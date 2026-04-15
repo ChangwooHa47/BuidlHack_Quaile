@@ -73,7 +73,16 @@ export default function EvaluationCriteriaPage() {
       const endNs = new Date(subscriptionEnd).getTime() * 1_000_000;
       const liveNs = new Date(liveEnd).getTime() * 1_000_000;
 
-      await registerPolicy(wallet, naturalLanguage, "bafybeibwzifw52ttrkqlikfzext5akxu7lz4xiwjgwzmqcpdzmp3n5mbdq", {
+      await registerPolicy(
+        wallet,
+        "New Project",   // TODO: add name input to form
+        "TKN",           // TODO: add ticker input
+        "A new IDO project on Qualie.",  // TODO: add description input
+        "NEAR",          // TODO: add chain selector
+        "https://placehold.co/128",
+        naturalLanguage,
+        "bafybeibwzifw52ttrkqlikfzext5akxu7lz4xiwjgwzmqcpdzmp3n5mbdq",
+        {
         token_contract: tokenContract,
         total_allocation: totalAllocation,
         price_per_token: pricePerToken,

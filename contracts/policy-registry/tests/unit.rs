@@ -51,6 +51,12 @@ fn valid_nl() -> String {
 /// A CIDv1 that passes is_valid_ipfs_cid (starts with "ba", ≥58 chars, lowercase alnum after).
 const VALID_CID: &str = "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3ocirgf5de2yjvei";
 
+fn meta_name() -> String { "Test Project".to_string() }
+fn meta_ticker() -> String { "TST".to_string() }
+fn meta_desc() -> String { "A test project.".to_string() }
+fn meta_chain() -> String { "NEAR".to_string() }
+fn meta_logo() -> String { "https://placehold.co/128".to_string() }
+
 // ── 1. Happy: owner adds foundation → foundation registers → get_policy returns it ──
 
 #[test]
@@ -64,7 +70,7 @@ fn test_happy_register_and_get_policy() {
     // 2. foundation registers a policy
     testing_env!(context(foundation()).block_timestamp(now).build());
     let sale_cfg = valid_sale_config(now, 3_600_000_000_000); // starts 1 h from now
-    let id = contract.register_policy(valid_nl(), VALID_CID.to_string(), sale_cfg.clone());
+    let id = contract.register_policy(meta_name(), meta_ticker(), meta_desc(), meta_chain(), meta_logo(), valid_nl(), VALID_CID.to_string(), sale_cfg.clone());
 
     // 3. get_policy returns it
     let policy = contract.get_policy(id).expect("policy should exist");
@@ -86,15 +92,13 @@ fn test_happy_next_policy_id_increments() {
 
     testing_env!(context(foundation()).block_timestamp(now).build());
     let id0 = contract.register_policy(
-        valid_nl(),
-        VALID_CID.to_string(),
-        valid_sale_config(now, 3_600_000_000_000),
+        meta_name(), meta_ticker(), meta_desc(), meta_chain(), meta_logo(),
+        valid_nl(), VALID_CID.to_string(), valid_sale_config(now, 3_600_000_000_000),
     );
 
     let id1 = contract.register_policy(
-        valid_nl(),
-        VALID_CID.to_string(),
-        valid_sale_config(now, 3_600_000_000_000),
+        meta_name(), meta_ticker(), meta_desc(), meta_chain(), meta_logo(),
+        valid_nl(), VALID_CID.to_string(), valid_sale_config(now, 3_600_000_000_000),
     );
 
     assert_eq!(id0, 0);
@@ -116,7 +120,7 @@ fn test_happy_subscription_start_in_past_panics() {
     // subscription_start = now - 1 (in the past)
     let mut bad_cfg = valid_sale_config(now, 3_600_000_000_000);
     bad_cfg.subscription_start = now - 1;
-    contract.register_policy(valid_nl(), VALID_CID.to_string(), bad_cfg);
+    contract.register_policy(meta_name(), meta_ticker(), meta_desc(), meta_chain(), meta_logo(), valid_nl(), VALID_CID.to_string(), bad_cfg);
 }
 
 // ── 4. Edge: non-foundation calls register_policy → NotAFoundation ────────────
@@ -131,9 +135,8 @@ fn test_edge_non_foundation_register_panics() {
 
     testing_env!(context(stranger()).block_timestamp(now).build());
     contract.register_policy(
-        valid_nl(),
-        VALID_CID.to_string(),
-        valid_sale_config(now, 3_600_000_000_000),
+        meta_name(), meta_ticker(), meta_desc(), meta_chain(), meta_logo(),
+        valid_nl(), VALID_CID.to_string(), valid_sale_config(now, 3_600_000_000_000),
     );
 }
 
@@ -149,9 +152,9 @@ fn test_edge_natural_language_too_short() {
 
     testing_env!(context(foundation()).block_timestamp(now).build());
     contract.register_policy(
+        meta_name(), meta_ticker(), meta_desc(), meta_chain(), meta_logo(),
         "0123456789".to_string(), // exactly 10 chars
-        VALID_CID.to_string(),
-        valid_sale_config(now, 3_600_000_000_000),
+        VALID_CID.to_string(), valid_sale_config(now, 3_600_000_000_000),
     );
 }
 
@@ -168,9 +171,8 @@ fn test_edge_natural_language_too_long() {
     testing_env!(context(foundation()).block_timestamp(now).build());
     let long_str = "a".repeat(5000);
     contract.register_policy(
-        long_str,
-        VALID_CID.to_string(),
-        valid_sale_config(now, 3_600_000_000_000),
+        meta_name(), meta_ticker(), meta_desc(), meta_chain(), meta_logo(),
+        long_str, VALID_CID.to_string(), valid_sale_config(now, 3_600_000_000_000),
     );
 }
 
@@ -186,9 +188,8 @@ fn test_edge_invalid_ipfs_cid() {
 
     testing_env!(context(foundation()).block_timestamp(now).build());
     contract.register_policy(
-        valid_nl(),
-        "foo".to_string(),
-        valid_sale_config(now, 3_600_000_000_000),
+        meta_name(), meta_ticker(), meta_desc(), meta_chain(), meta_logo(),
+        valid_nl(), "foo".to_string(), valid_sale_config(now, 3_600_000_000_000),
     );
 }
 
@@ -205,7 +206,7 @@ fn test_edge_zero_total_allocation() {
     testing_env!(context(foundation()).block_timestamp(now).build());
     let mut bad_cfg = valid_sale_config(now, 3_600_000_000_000);
     bad_cfg.total_allocation = U128(0);
-    contract.register_policy(valid_nl(), VALID_CID.to_string(), bad_cfg);
+    contract.register_policy(meta_name(), meta_ticker(), meta_desc(), meta_chain(), meta_logo(), valid_nl(), VALID_CID.to_string(), bad_cfg);
 }
 
 // ── 9. Edge: advance_status when time not met → returns Upcoming (no-op) ─────
@@ -221,9 +222,8 @@ fn test_edge_advance_status_noop_before_subscription_start() {
     testing_env!(context(foundation()).block_timestamp(now).build());
     let start_offset = 3_600_000_000_000u64; // 1 h from now
     let id = contract.register_policy(
-        valid_nl(),
-        VALID_CID.to_string(),
-        valid_sale_config(now, start_offset),
+        meta_name(), meta_ticker(), meta_desc(), meta_chain(), meta_logo(),
+        valid_nl(), VALID_CID.to_string(), valid_sale_config(now, start_offset),
     );
 
     // Set block_timestamp BEFORE subscription_start
@@ -250,9 +250,8 @@ fn test_advance_status_transitions_to_subscribing() {
     let start_offset = 3_600_000_000_000u64;
     testing_env!(context(foundation()).block_timestamp(now).build());
     let id = contract.register_policy(
-        valid_nl(),
-        VALID_CID.to_string(),
-        valid_sale_config(now, start_offset),
+        meta_name(), meta_ticker(), meta_desc(), meta_chain(), meta_logo(),
+        valid_nl(), VALID_CID.to_string(), valid_sale_config(now, start_offset),
     );
 
     // Set block_timestamp >= subscription_start
@@ -283,9 +282,8 @@ fn test_edge_non_escrow_mark_closed_panics() {
     let start_offset = 3_600_000_000_000u64;
     testing_env!(context(foundation()).block_timestamp(now).build());
     let id = contract.register_policy(
-        valid_nl(),
-        VALID_CID.to_string(),
-        valid_sale_config(now, start_offset),
+        meta_name(), meta_ticker(), meta_desc(), meta_chain(), meta_logo(),
+        valid_nl(), VALID_CID.to_string(), valid_sale_config(now, start_offset),
     );
 
     // stranger (not escrow) tries to mark_closed
@@ -308,8 +306,7 @@ fn test_edge_removed_foundation_cannot_register() {
     // foundation tries to register after being removed
     testing_env!(context(foundation()).block_timestamp(now).build());
     contract.register_policy(
-        valid_nl(),
-        VALID_CID.to_string(),
-        valid_sale_config(now, 3_600_000_000_000),
+        meta_name(), meta_ticker(), meta_desc(), meta_chain(), meta_logo(),
+        valid_nl(), VALID_CID.to_string(), valid_sale_config(now, 3_600_000_000_000),
     );
 }
