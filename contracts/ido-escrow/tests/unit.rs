@@ -4,13 +4,14 @@ use near_sdk::json_types::U128;
 
 use ido_escrow::IdoEscrow;
 use tee_shared::{
-    AttestationBundle, AttestationPayload, Contribution, ContributionOutcome, EvidenceSummary,
+    AttestationBundle, AttestationPayload, Contribution, ContributionOutcome, CriteriaResults,
     PolicyId, Verdict,
 };
 
 fn owner() -> AccountId { "owner.testnet".parse().unwrap() }
 fn registry() -> AccountId { "registry.testnet".parse().unwrap() }
 fn verifier() -> AccountId { "verifier.testnet".parse().unwrap() }
+fn zk_verifier() -> AccountId { "zkverifier.testnet".parse().unwrap() }
 fn investor1() -> AccountId { "investor1.testnet".parse().unwrap() }
 fn investor2() -> AccountId { "investor2.testnet".parse().unwrap() }
 
@@ -22,7 +23,7 @@ fn context(predecessor: AccountId) -> VMContextBuilder {
 
 fn init_escrow() -> IdoEscrow {
     testing_env!(context(owner()).build());
-    IdoEscrow::new(owner(), registry(), verifier())
+    IdoEscrow::new(owner(), registry(), verifier(), zk_verifier())
 }
 
 fn dummy_payload(subject: AccountId, policy_id: PolicyId) -> AttestationPayload {
@@ -30,19 +31,11 @@ fn dummy_payload(subject: AccountId, policy_id: PolicyId) -> AttestationPayload 
         subject,
         policy_id,
         verdict: Verdict::Eligible,
-        score: 8000,
         issued_at: 1_000_000_000_000_000_000,
         expires_at: 2_000_000_000_000_000_000,
         nonce: [0x42u8; 32],
-        evidence_summary: EvidenceSummary {
-            wallet_count_near: 1,
-            wallet_count_evm: 2,
-            avg_holding_days: 365,
-            total_dao_votes: 5,
-            github_included: true,
-            rationale: "Strong holder".to_string(),
-        },
-        payload_version: 1,
+        criteria_results: CriteriaResults::from_vec(vec![true, true, true]),
+        payload_version: 2,
     }
 }
 
