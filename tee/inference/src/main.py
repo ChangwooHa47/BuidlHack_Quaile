@@ -171,6 +171,18 @@ def create_app(services: AppServices | None = None) -> FastAPI:
             signing_address=signer.address, key_id=signer.key_id, tee_report=None
         )
 
+    @app.post("/v1/structurize")
+    async def structurize(body: dict) -> dict:
+        """Convert natural language criteria into structured evaluation items."""
+        nl = body.get("natural_language", "")
+        if not nl or len(nl) < 10:
+            raise HTTPException(status_code=400, detail="natural_language too short")
+        try:
+            rules = await app.state.services.deps.llm_client.structurize(nl)
+            return {"criteria": rules.criteria, "qualitative_prompt": rules.qualitative_prompt}
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
     @app.post("/v1/attest", response_model=AttestationResponseModel)
     async def attest(persona: PersonaSubmission) -> AttestationResponseModel:
         try:
