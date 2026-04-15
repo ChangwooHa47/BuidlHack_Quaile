@@ -146,16 +146,31 @@ async def run_demo(policy_nl: str, investor: str, use_mock: bool) -> None:
         llm = MockLlmClient()
     else:
         from nearai_client import NearAIClient
-        from dotenv import load_dotenv
+        try:
+            from dotenv import load_dotenv
+        except ImportError:
+            print("\033[31mError: python-dotenv not installed. Run: pip install python-dotenv\033[0m")
+            print("\033[31m       Or use --mock for offline demo.\033[0m")
+            return
         env_path = os.path.join(os.path.dirname(__file__), "..", "..", "tee", "inference", ".env")
         load_dotenv(env_path)
+        api_key = os.getenv("NEAR_AI_API_KEY", "")
+        if not api_key:
+            print("\033[31mError: NEAR_AI_API_KEY not set in tee/inference/.env\033[0m")
+            print("\033[31m       Or use --mock for offline demo.\033[0m")
+            return
         llm = NearAIClient(
-            api_key=os.getenv("NEAR_AI_API_KEY", ""),
+            api_key=api_key,
             base_url=os.getenv("NEAR_AI_BASE_URL", "https://api.near.ai/v1"),
             model=os.getenv("NEAR_AI_MODEL", "deepseek-ai/DeepSeek-V3.1"),
         )
 
-    rules = await llm.structurize(policy_nl)
+    try:
+        rules = await llm.structurize(policy_nl)
+    except Exception as exc:
+        print(f"\n\033[31mLLM call failed: {exc}\033[0m")
+        print("\033[31mTry --mock for offline demo.\033[0m")
+        return
 
     print()
     for i, c in enumerate(rules.criteria):
@@ -169,7 +184,12 @@ async def run_demo(policy_nl: str, investor: str, use_mock: bool) -> None:
     pause(0.8)
 
     self_intro = "Long-term DeFi participant with DAO governance experience across multiple chains."
-    result = await llm.judge(rules, signals, self_intro)
+    try:
+        result = await llm.judge(rules, signals, self_intro)
+    except Exception as exc:
+        print(f"\n\033[31mLLM judge failed: {exc}\033[0m")
+        print("\033[31mTry --mock for offline demo.\033[0m")
+        return
 
     print()
     for c in result.criteria:
