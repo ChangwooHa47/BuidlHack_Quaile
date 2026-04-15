@@ -6,7 +6,7 @@ import Link from "next/link";
 import Header from "@/components/Header";
 import { useWallet } from "@/contexts/WalletContext";
 import { useIdentity } from "@/contexts/IdentityContext";
-import { connectEvmWallet, signEvmMessage, disconnectEvmWallet } from "@/lib/evm/connect";
+import { connectEvmWallet, type WalletMethod } from "@/lib/evm/connect";
 import { buildCanonicalMessage, generateNonce, nowNs, SUPPORTED_CHAINS } from "@/lib/evm/message";
 import { getAllPolicies } from "@/lib/near/contracts";
 
@@ -27,7 +27,7 @@ export default function IdentityPage() {
     isIdentityComplete,
   } = useIdentity();
 
-  const [connecting, setConnecting] = useState(false);
+  const [connecting, setConnecting] = useState<WalletMethod | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [policyId, setPolicyId] = useState<number>(0);
 
@@ -40,39 +40,34 @@ export default function IdentityPage() {
     }).catch(() => {});
   }, [slug]);
 
-  async function handleAddWallet() {
-    setConnecting(true);
+  async function handleAddWallet(method: WalletMethod) {
+    setConnecting(method);
     setError(null);
     try {
-      // 1. Open Web3Modal → user picks any wallet
-      const { address, chainId } = await connectEvmWallet();
+      const { address, chainId, sign } = await connectEvmWallet(method);
 
       if (!SUPPORTED_CHAINS[chainId]) {
-        await disconnectEvmWallet();
         setError(`Chain ${chainId} not supported. Switch to Ethereum, Base, Arbitrum, Optimism, Polygon, or BSC.`);
-        setConnecting(false);
+        setConnecting(null);
         return;
       }
 
-      // 2. Sign ownership message
+      // Sign ownership message
       const nonce = generateNonce();
       const ts = nowNs();
       const message = buildCanonicalMessage(policyId, nonce, ts, chainId, address);
-      const signature = await signEvmMessage(message);
+      const signature = await sign(message);
 
-      // 3. Store in context
+      // Store
       addEvmWallet(chainId, address);
       markEvmSigned(address, signature, message);
-
-      // 4. Disconnect so next "Add Wallet" opens fresh
-      await disconnectEvmWallet();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
-      if (!msg.includes("rejected") && !msg.includes("denied") && !msg.includes("closed")) {
+      if (!msg.includes("rejected") && !msg.includes("denied")) {
         setError(msg || "Failed to connect");
       }
     } finally {
-      setConnecting(false);
+      setConnecting(null);
     }
   }
 
@@ -110,9 +105,14 @@ export default function IdentityPage() {
           </p>
 
           <h1 className="text-2xl font-semibold text-gray-1000">Build Your Persona</h1>
-          <p className="mt-xs text-sm text-gray-600">
-            Connect your wallets and tell us about yourself. This information is sent to a TEE for private evaluation — the project foundation never sees your raw data.
-          </p>
+
+          {/* Privacy */}
+          <div className="mt-md rounded-2xl border border-neon-glow/20 bg-neon-glow/5 px-xl py-md">
+            <p className="text-sm text-neon-glow font-medium">Privacy Guarantee</p>
+            <p className="mt-xs text-xs text-gray-600">
+              Your wallet addresses, self-introduction, and GitHub data are sent to a Trusted Execution Environment (TEE) for private evaluation. The project foundation only receives a pass/fail result — never your raw data.
+            </p>
+          </div>
 
           {/* Progress */}
           <div className="mt-lg flex items-center gap-md text-xs">
@@ -175,14 +175,27 @@ export default function IdentityPage() {
                 </div>
               )}
 
-              {/* Add wallet button */}
-              <button
-                onClick={handleAddWallet}
-                disabled={connecting}
-                className="mt-md w-full rounded-xl border border-dashed border-gray-500 py-md text-sm text-gray-600 hover:bg-alpha-8 transition-colors disabled:opacity-40"
-              >
-                {connecting ? "Connecting..." : evmWallets.length === 0 ? "Connect Wallet" : "+ Add Wallet"}
-              </button>
+              {/* Connect buttons */}
+              <div className="mt-md flex gap-sm">
+                <button
+                  onClick={() => handleAddWallet("injected")}
+                  disabled={connecting !== null}
+                  className="flex-1 rounded-xl border border-border bg-background px-md py-md text-center transition-colors hover:bg-alpha-8 disabled:opacity-40"
+                >
+                  <p className="text-sm font-medium text-gray-1000">Browser Wallet</p>
+                  <p className="mt-2xs text-[11px] text-gray-500">MetaMask, Rabby, etc.</p>
+                  {connecting === "injected" && <p className="mt-xs text-[11px] text-neon-glow animate-pulse">Connecting...</p>}
+                </button>
+                <button
+                  onClick={() => handleAddWallet("walletconnect")}
+                  disabled={connecting !== null}
+                  className="flex-1 rounded-xl border border-border bg-background px-md py-md text-center transition-colors hover:bg-alpha-8 disabled:opacity-40"
+                >
+                  <p className="text-sm font-medium text-gray-1000">WalletConnect</p>
+                  <p className="mt-2xs text-[11px] text-gray-500">QR code / mobile</p>
+                  {connecting === "walletconnect" && <p className="mt-xs text-[11px] text-neon-glow animate-pulse">Connecting...</p>}
+                </button>
+              </div>
 
               {error && <p className="mt-md rounded-xl bg-status-refund/10 px-lg py-md text-sm text-status-refund">{error}</p>}
             </section>
@@ -224,14 +237,6 @@ export default function IdentityPage() {
                 </button>
               </div>
             </section>
-
-            {/* ── Privacy ── */}
-            <div className="rounded-2xl border border-neon-glow/20 bg-neon-glow/5 px-xl py-md">
-              <p className="text-sm text-neon-glow font-medium">Privacy Guarantee</p>
-              <p className="mt-xs text-xs text-gray-600">
-                Your wallet addresses, self-introduction, and GitHub data are sent to a TEE for private evaluation. The project foundation only receives a pass/fail result — never your raw data.
-              </p>
-            </div>
 
             {/* ── Save ── */}
             <button

@@ -1,74 +1,82 @@
 import { BrowserProvider } from "ethers";
-import { getWeb3Modal } from "./web3modal";
+
+export type WalletMethod = "injected" | "walletconnect";
+
+interface ConnectResult {
+  address: string;
+  chainId: number;
+  sign: (message: string) => Promise<string>;
+}
 
 /**
- * Open Web3Modal, let user pick any wallet, connect, return address + chainId.
- * After capturing address, the caller should immediately sign and then
- * the connection can be released for the next wallet.
+ * Connect via injected provider (MetaMask, Rabby, Rainbow, etc.)
+ * Uses wallet_requestPermissions to force account picker every time.
  */
-export async function connectEvmWallet(): Promise<{ address: string; chainId: number }> {
-  const modal = getWeb3Modal();
+async function connectInjected(): Promise<ConnectResult> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const eth = (window as any).ethereum;
+  if (!eth) throw new Error("No browser wallet found. Install MetaMask or similar.");
 
-  // Open the wallet picker
-  await modal.open();
-
-  // Wait until a provider is available (user picked a wallet)
-  const provider = await new Promise<BrowserProvider>((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error("Connection timeout")), 120000);
-    const check = setInterval(() => {
-      const wp = modal.getWalletProvider?.();
-      if (wp) {
-        clearInterval(check);
-        clearTimeout(timeout);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        resolve(new BrowserProvider(wp as any));
-      }
-    }, 300);
-
-    // Also listen for modal close without connecting
-    modal.subscribeEvents?.((event: { data: { event: string } }) => {
-      if (event.data.event === "MODAL_CLOSE") {
-        const wp = modal.getWalletProvider?.();
-        if (!wp) {
-          clearInterval(check);
-          clearTimeout(timeout);
-          reject(new Error("User closed wallet picker"));
-        }
-      }
-    });
+  // Force account picker — revokes cached permission and re-prompts
+  await eth.request({
+    method: "wallet_requestPermissions",
+    params: [{ eth_accounts: {} }],
   });
 
-  const accounts = await provider.send("eth_requestAccounts", []);
-  if (!accounts[0]) throw new Error("No account returned");
+  const provider = new BrowserProvider(eth);
+  const signer = await provider.getSigner();
+  const address = (await signer.getAddress()).toLowerCase();
   const network = await provider.getNetwork();
+
   return {
-    address: (accounts[0] as string).toLowerCase(),
+    address,
     chainId: Number(network.chainId),
+    sign: (msg: string) => signer.signMessage(msg),
   };
 }
 
 /**
- * Sign a message using the currently connected Web3Modal provider.
- * Must be called while the wallet is still connected (before disconnect).
+ * Connect via WalletConnect QR code.
+ * Creates a fresh provider each time — no session reuse.
  */
-export async function signEvmMessage(message: string): Promise<string> {
-  const modal = getWeb3Modal();
-  const wp = modal.getWalletProvider?.();
-  if (!wp) throw new Error("No wallet connected");
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const provider = new BrowserProvider(wp as any);
+async function connectWalletConnect(): Promise<ConnectResult> {
+  const { EthereumProvider } = await import("@walletconnect/ethereum-provider");
+  const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "";
+  if (!projectId || projectId === "PLACEHOLDER") {
+    throw new Error("WalletConnect project ID not configured");
+  }
+
+  const wc = await EthereumProvider.init({
+    projectId,
+    chains: [1],
+    optionalChains: [8453, 42161, 10, 137, 56],
+    showQrModal: true,
+  });
+
+  await wc.connect();
+
+  const provider = new BrowserProvider(wc);
   const signer = await provider.getSigner();
-  return signer.signMessage(message);
+  const address = (await signer.getAddress()).toLowerCase();
+  const network = await provider.getNetwork();
+
+  return {
+    address,
+    chainId: Number(network.chainId),
+    sign: async (msg: string) => {
+      const sig = await signer.signMessage(msg);
+      try { await wc.disconnect(); } catch { /* cleanup */ }
+      return sig;
+    },
+  };
 }
 
 /**
- * Disconnect the current Web3Modal session so a new wallet can be added.
+ * Connect a wallet and return address + chainId + sign function.
  */
-export async function disconnectEvmWallet(): Promise<void> {
-  const modal = getWeb3Modal();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const m = modal as any;
-  if (typeof m.disconnect === "function") {
-    await m.disconnect();
+export async function connectEvmWallet(method: WalletMethod): Promise<ConnectResult> {
+  switch (method) {
+    case "injected": return connectInjected();
+    case "walletconnect": return connectWalletConnect();
   }
 }
