@@ -318,6 +318,35 @@ impl PolicyRegistry {
         emit_policy_status_advanced(id, &from_status, &PolicyStatus::Closed, now);
     }
 
+    /// Owner only: force a policy to any status (testnet/demo only).
+    /// Bypasses time checks for testing convenience.
+    pub fn force_status(&mut self, id: PolicyId, status: PolicyStatus) {
+        self.assert_owner();
+        let mut policy = match self.policies.get(&id) {
+            Some(p) => p,
+            None => PolicyError::PolicyNotFound(id).panic(),
+        };
+
+        let from_status = policy.status.clone();
+        if from_status == status {
+            return;
+        }
+
+        self.remove_from_status_vec(&from_status, id);
+
+        let mut to_vec = self
+            .by_status
+            .get(&status)
+            .expect("status vector not initialized");
+        to_vec.push(&id);
+        self.by_status.insert(&status, &to_vec);
+
+        policy.status = status.clone();
+        self.policies.insert(&id, &policy);
+
+        emit_policy_status_advanced(id, &from_status, &status, env::block_timestamp());
+    }
+
     /// Owner only: set the escrow contract account.
     pub fn set_escrow_account(&mut self, escrow: AccountId) {
         self.assert_owner();

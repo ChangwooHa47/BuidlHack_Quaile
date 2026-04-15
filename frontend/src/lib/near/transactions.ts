@@ -95,6 +95,27 @@ export async function registerPolicy(
   });
 }
 
+export async function forceStatus(
+  wallet: Wallet,
+  policyId: number,
+  status: "Upcoming" | "Subscribing" | "Live" | "Closed",
+) {
+  return wallet.signAndSendTransaction({
+    receiverId: CONTRACT_IDS.policyRegistry,
+    actions: [
+      {
+        type: "FunctionCall",
+        params: {
+          methodName: "force_status",
+          args: { id: policyId, status },
+          gas: "50000000000000",
+          deposit: "0",
+        },
+      },
+    ],
+  });
+}
+
 export async function advanceStatus(wallet: Wallet, policyId: number) {
   return wallet.signAndSendTransaction({
     receiverId: CONTRACT_IDS.policyRegistry,
