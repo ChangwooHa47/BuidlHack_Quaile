@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 import httpx
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 from attestation_verifier import verify_near_ai_report
 from config import Config
@@ -149,6 +150,13 @@ def create_app(services: AppServices | None = None) -> FastAPI:
                 near_rpc_url=config.near_rpc_url,
             )
         )
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],  # staging: restrict to Vercel domain
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     app.state.services = services
 
