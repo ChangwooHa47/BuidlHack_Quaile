@@ -21,6 +21,7 @@ pub struct IdoEscrow {
     pub owner: AccountId,
     pub policy_registry: AccountId,
     pub attestation_verifier: AccountId,
+    pub zk_verifier: AccountId,
 
     /// key = sha256(investor_bytes || policy_id_le) → Contribution
     pub contributions: LookupMap<[u8; 32], Contribution>,
@@ -51,11 +52,13 @@ impl IdoEscrow {
         owner: AccountId,
         policy_registry: AccountId,
         attestation_verifier: AccountId,
+        zk_verifier: AccountId,
     ) -> Self {
         Self {
             owner,
             policy_registry,
             attestation_verifier,
+            zk_verifier,
             contributions: LookupMap::new(StorageKey::Contributions),
             policy_pending_total: LookupMap::new(StorageKey::PolicyPendingTotal),
             policy_investors: LookupMap::new(StorageKey::PolicyInvestors),
