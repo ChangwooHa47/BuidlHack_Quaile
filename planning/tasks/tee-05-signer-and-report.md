@@ -1,9 +1,9 @@
 ---
 id: tee-05-signer-and-report
-status: todo
+status: done
 sub: TEE
 layer: tee
-depends_on: [tee-01-persona-schema, tee-04-llm-judge]
+depends_on: [tee-01-persona-schema, zk-06-tee-python-criteria]
 estimate: 1.5h
 demo_step: "Subscribing.Review (출력)"
 ---
