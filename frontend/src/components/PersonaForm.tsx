@@ -13,7 +13,7 @@ interface PersonaFormProps {
 
 export default function PersonaForm({ policyId, onAttestationComplete }: PersonaFormProps) {
   const { accountId } = useWallet();
-  const { evmWallets, selfIntro } = useIdentity();
+  const { evmWallets, selfIntro, githubToken } = useIdentity();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,7 +43,7 @@ export default function PersonaForm({ policyId, onAttestationComplete }: Persona
           })),
         },
         self_intro: selfIntro,
-        github_oauth_token: null,
+        github_oauth_token: githubToken,
         nonce: "0x" + nonce,
         client_timestamp: clientTs,
       };

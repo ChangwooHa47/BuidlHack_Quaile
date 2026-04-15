@@ -40,3 +40,4 @@ scripts/e2e/out/
 scripts/deploy/out/
 .secrets/
 .DS_Store
+.next/

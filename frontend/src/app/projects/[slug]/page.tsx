@@ -1,9 +1,12 @@
 import Header from "@/components/Header";
 import StatusBadge from "@/components/StatusBadge";
 import SubscribingSidebar from "@/components/SubscribingSidebar";
-import { getPolicy, getPolicyInvestorCount, getPolicyPendingTotal } from "@/lib/near/contracts";
+import { getAllPolicies, getPolicyInvestorCount, getPolicyPendingTotal } from "@/lib/near/contracts";
 import { notFound } from "next/navigation";
-import type { Phase } from "@/types";
+
+function slugify(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+$/, "");
+}
 
 function formatNear(yocto: string): string {
   const near = Number(BigInt(yocto) / BigInt(10 ** 21)) / 1000;
@@ -20,12 +23,13 @@ export default async function ProjectDetailPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const match = slug.match(/^policy-(\d+)$/);
-  if (!match) notFound();
 
-  const policyId = Number(match[1]);
-  const policy = await getPolicy(policyId);
+  // Find policy by slugified name
+  const policies = await getAllPolicies();
+  const policy = policies.find((p) => slugify(p.name) === slug);
   if (!policy) notFound();
+
+  const policyId = policy.id;
 
   const [subscribers, pendingTotal] = await Promise.all([
     getPolicyInvestorCount(policyId),
@@ -124,6 +128,7 @@ export default async function ProjectDetailPage({
                 ticker={policy.ticker}
                 status={policy.status}
                 policyId={policy.id}
+                slug={slug}
               />
             </aside>
           </div>
