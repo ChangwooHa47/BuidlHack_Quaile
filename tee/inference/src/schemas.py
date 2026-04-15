@@ -69,28 +69,25 @@ class PersonaSubmission(BaseModel):
         return _bytes_to_0x(value)
 
 
-class RuleWeightsModel(BaseModel):
-    quantitative: float = 0.6
-    qualitative: float = 0.4
+class CriterionResult(BaseModel):
+    description: str
+    passed: bool
 
 
-class StructuredRulesModel(BaseModel):
-    min_wallet_holding_days: int | None = None
-    min_wallet_age_days: int | None = None
-    min_total_tx_count: int | None = None
-    min_dao_votes: int | None = None
-    min_github_contributions: int | None = None
-    required_token_holdings: list[str] = Field(default_factory=list)
+class CriteriaRulesModel(BaseModel):
+    criteria: list[str]
     qualitative_prompt: str
-    weights: RuleWeightsModel
 
 
 class JudgeOutputModel(BaseModel):
     verdict: Literal["Eligible", "Ineligible"]
-    score: int
+    criteria: list[CriterionResult]
     rationale: str
-    quantitative_score: int
-    qualitative_score: int
+
+
+class CriteriaResultsModel(BaseModel):
+    results: list[bool]  # length = MAX_CRITERIA (10), padded with True
+    count: int
 
 
 class PolicySaleConfigModel(BaseModel):
@@ -264,24 +261,14 @@ class AggregatedSignalModel(BaseModel):
         }
 
 
-class EvidenceSummaryModel(BaseModel):
-    wallet_count_near: int
-    wallet_count_evm: int
-    avg_holding_days: int
-    total_dao_votes: int
-    github_included: bool
-    rationale: str
-
-
 class AttestationPayloadModel(BaseModel):
     subject: str
     policy_id: int
     verdict: Literal["Eligible", "Ineligible"]
-    score: int
     issued_at: int
     expires_at: int
     nonce: bytes
-    evidence_summary: EvidenceSummaryModel
+    criteria_results: CriteriaResultsModel
     payload_version: int
 
     @field_validator("nonce", mode="before")
@@ -343,6 +330,33 @@ class AttestationBundleModel(BaseModel):
 class AttestationBundleWithReportModel(BaseModel):
     bundle: AttestationBundleModel
     tee_report: bytes
+
+    @field_validator("tee_report", mode="before")
+    @classmethod
+    def parse_report(cls, value: object) -> bytes:
+        if isinstance(value, bytes):
+            return value
+        if isinstance(value, str):
+            return base64.b64decode(value)
+        raise TypeError("tee_report must be bytes or base64 string")
+
+    @field_serializer("tee_report")
+    def serialize_report(self, value: bytes) -> str:
+        return base64.b64encode(value).decode("ascii")
+
+
+class ZkCircuitInputModel(BaseModel):
+    """Client uses this to generate a snarkjs groth16 proof."""
+    payload_hash_limbs: list[str]  # 4 x 64-bit limbs (decimal string)
+    criteria: list[int]            # [1,1,1,0,...] MAX_CRITERIA entries, 0 or 1
+    criteria_count: str            # decimal string
+
+
+class AttestationResponseModel(BaseModel):
+    """Full response from /v1/attest endpoint."""
+    bundle: AttestationBundleModel
+    tee_report: bytes
+    zk_input: ZkCircuitInputModel
 
     @field_validator("tee_report", mode="before")
     @classmethod

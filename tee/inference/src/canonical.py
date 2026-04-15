@@ -4,7 +4,7 @@ import struct
 
 from eth_hash.auto import keccak
 
-from schemas import AttestationPayloadModel, EvidenceSummaryModel
+from schemas import AttestationPayloadModel, CriteriaResultsModel
 
 
 def borsh_u8(v: int) -> bytes:
@@ -38,27 +38,26 @@ def borsh_fixed_array(data: bytes, n: int) -> bytes:
     return data
 
 
-def serialize_evidence_summary(summary: EvidenceSummaryModel) -> bytes:
-    return (
-        borsh_u8(summary.wallet_count_near)
-        + borsh_u8(summary.wallet_count_evm)
-        + borsh_u32(summary.avg_holding_days)
-        + borsh_u32(summary.total_dao_votes)
-        + borsh_bool(summary.github_included)
-        + borsh_string(summary.rationale)
-    )
+def serialize_criteria_results(cr: CriteriaResultsModel) -> bytes:
+    # [bool; 10] (fixed-size, no length prefix) + u8(count)
+    buf = b""
+    for r in cr.results:
+        buf += borsh_bool(r)
+    buf += borsh_u8(cr.count)
+    return buf
 
 
 def serialize_attestation_payload(payload: AttestationPayloadModel) -> bytes:
+    # Field order must match Rust AttestationPayload exactly:
+    # subject, policy_id, verdict, issued_at, expires_at, nonce, criteria_results, payload_version
     return (
         borsh_string(payload.subject)
         + borsh_u64(payload.policy_id)
         + borsh_u8(0 if payload.verdict == "Eligible" else 1)
-        + borsh_u16(payload.score)
         + borsh_u64(payload.issued_at)
         + borsh_u64(payload.expires_at)
         + borsh_fixed_array(payload.nonce, 32)
-        + serialize_evidence_summary(payload.evidence_summary)
+        + serialize_criteria_results(payload.criteria_results)
         + borsh_u8(payload.payload_version)
     )
 

@@ -5,29 +5,24 @@ import json
 
 from openai import AsyncOpenAI
 
-from schemas import AggregatedSignalModel, JudgeOutputModel, StructuredRulesModel
+from schemas import AggregatedSignalModel, CriteriaRulesModel, JudgeOutputModel
 
 STRUCTURE_PROMPT = """You are a policy structurizer for an IDO launchpad.
 Given a foundation's natural language criterion for selecting investors, extract:
-- Quantitative rules (numeric thresholds)
+- A list of concrete yes/no evaluation criteria (max 10)
 - A qualitative prompt that captures the INTENT for later LLM judgment
-- Weights between quantitative and qualitative evaluation
+
+Each criterion must be answerable with pass/fail given on-chain signals and self-introduction.
 
 Output STRICT JSON matching this schema:
 {
-  "min_wallet_holding_days": int | null,
-  "min_wallet_age_days": int | null,
-  "min_total_tx_count": int | null,
-  "min_dao_votes": int | null,
-  "min_github_contributions": int | null,
-  "required_token_holdings": [string],
-  "qualitative_prompt": string,
-  "weights": {"quantitative": float, "qualitative": float}
+  "criteria": ["criterion 1 description", "criterion 2 description", ...],
+  "qualitative_prompt": string
 }
 
 Rules:
-- Leave numeric thresholds as null if not implied by the text.
-- weights must sum to 1.0.
+- Each criterion must be a single, clear yes/no question or threshold check.
+- Maximum 10 criteria.
 - qualitative_prompt should guide a later LLM judge; include specific behavioral traits.
 - No preamble, no explanation. JSON ONLY.
 """
@@ -35,20 +30,26 @@ Rules:
 
 JUDGE_PROMPT = """You are an IDO investor evaluator running inside a TEE.
 You are given:
-- A foundation's criterion (already structurized)
+- A list of evaluation criteria to judge
 - Aggregated on-chain signals (anonymized)
 - Optional GitHub activity summary
 - Optional self-introduction text
 
+For each criterion, determine whether the investor passes (true) or fails (false).
+The final verdict is Eligible ONLY if ALL criteria pass; otherwise Ineligible.
+
 Output STRICT JSON:
 {
   "verdict": "Eligible" | "Ineligible",
-  "score": int (0..=10000),
+  "criteria": [
+    {"description": "criterion text", "passed": true/false},
+    ...
+  ],
   "rationale": string (≤ 280 chars, NO PII, NO wallet addresses,
-    NO GitHub username, NO real-name references),
-  "quantitative_score": int (0..=10000),
-  "qualitative_score": int (0..=10000)
+    NO GitHub username, NO real-name references)
 }
+
+CRITICAL: verdict MUST be "Eligible" if and only if every criterion has passed=true.
 """
 
 
@@ -96,18 +97,18 @@ class NearAIClient:
                 await asyncio.sleep(self.retry_delay_s * (2**attempt))
         raise last_exc or RuntimeError("NEAR AI chat completion failed")
 
-    async def structurize(self, natural_language: str) -> StructuredRulesModel:
+    async def structurize(self, natural_language: str) -> CriteriaRulesModel:
         content = await self.chat(
             system=STRUCTURE_PROMPT,
             user=natural_language,
             temperature=0,
             response_format={"type": "json_object"},
         )
-        return StructuredRulesModel.model_validate_json(content)
+        return CriteriaRulesModel.model_validate_json(content)
 
     async def judge(
         self,
-        rules: StructuredRulesModel,
+        rules: CriteriaRulesModel,
         signals: AggregatedSignalModel,
         self_intro: str,
     ) -> JudgeOutputModel:
@@ -115,7 +116,8 @@ class NearAIClient:
             system=JUDGE_PROMPT,
             user=json.dumps(
                 {
-                    "rules": rules.model_dump(),
+                    "criteria": rules.criteria,
+                    "qualitative_prompt": rules.qualitative_prompt,
                     "signals": signals.anon_summary(),
                     "self_intro": self_intro[:2000],
                 }
