@@ -12,6 +12,7 @@ export const CONTRACT_IDS = {
   policyRegistry: process.env.NEXT_PUBLIC_POLICY_REGISTRY ?? `policy.buidlnear.${NEAR_NETWORK}`,
   attestationVerifier: process.env.NEXT_PUBLIC_ATTESTATION_VERIFIER ?? `verifier.buidlnear.${NEAR_NETWORK}`,
   idoEscrow: process.env.NEXT_PUBLIC_IDO_ESCROW ?? `escrow.buidlnear.${NEAR_NETWORK}`,
+  zkVerifier: process.env.NEXT_PUBLIC_ZK_VERIFIER ?? `zkverifier.buidlnear.${NEAR_NETWORK}`,
 } as const;
 
 export const TEE_API_URL = process.env.NEXT_PUBLIC_TEE_API_URL ?? "http://localhost:8080";

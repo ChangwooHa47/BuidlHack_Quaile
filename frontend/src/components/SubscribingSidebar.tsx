@@ -1,6 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import StatusBadge from "./StatusBadge";
+import PersonaForm from "./PersonaForm";
+import ContributeButton from "./ContributeButton";
 import { useWallet } from "@/contexts/WalletContext";
 import { useIdentity } from "@/contexts/IdentityContext";
 import type { Phase } from "@/types";
@@ -9,11 +12,17 @@ interface SubscribingSidebarProps {
   name: string;
   ticker: string;
   status: Phase;
+  policyId?: number;
 }
 
-export default function SubscribingSidebar({ name, ticker, status }: SubscribingSidebarProps) {
+type Flow = "identity" | "persona" | "contribute";
+
+export default function SubscribingSidebar({ name, ticker, status, policyId }: SubscribingSidebarProps) {
   const { isConnected } = useWallet();
   const { nearAccountId, evmWallets, githubConnected } = useIdentity();
+  const [flow, setFlow] = useState<Flow>("identity");
+
+  const isSubscribing = status === "Subscribing";
 
   return (
     <div className="sticky top-20 rounded-xl border border-border bg-surface p-lg">
@@ -55,17 +64,33 @@ export default function SubscribingSidebar({ name, ticker, status }: Subscribing
         </div>
       </div>
 
-      <div className="space-y-xs">
-        <button className="w-full rounded-lg border border-gray-500 py-2.5 text-sm font-medium text-gray-1000 hover:bg-alpha-8 transition-colors">
-          Edit Identity
-        </button>
-        <button
-          disabled={!isConnected}
-          className="w-full rounded-lg bg-neon-glow py-2.5 text-sm font-medium text-gray-0 transition-colors enabled:hover:bg-neon-soft disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          Subscribe
-        </button>
-      </div>
+      {flow === "identity" && (
+        <div className="space-y-xs">
+          <button className="w-full rounded-lg border border-gray-500 py-2.5 text-sm font-medium text-gray-1000 hover:bg-alpha-8 transition-colors">
+            Edit Identity
+          </button>
+          {isSubscribing && policyId !== undefined && (
+            <button
+              disabled={!isConnected}
+              onClick={() => setFlow("persona")}
+              className="w-full rounded-lg bg-neon-glow py-2.5 text-sm font-medium text-gray-0 transition-colors enabled:hover:bg-neon-soft disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Subscribe
+            </button>
+          )}
+        </div>
+      )}
+
+      {flow === "persona" && policyId !== undefined && (
+        <PersonaForm
+          policyId={policyId}
+          onAttestationComplete={() => setFlow("contribute")}
+        />
+      )}
+
+      {flow === "contribute" && policyId !== undefined && (
+        <ContributeButton policyId={policyId} />
+      )}
     </div>
   );
 }

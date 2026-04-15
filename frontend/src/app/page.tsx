@@ -1,95 +1,86 @@
 import Header from "@/components/Header";
 import FilterTabs from "@/components/FilterTabs";
-import type { ProjectMeta } from "@/types";
+import type { ProjectMeta, Status } from "@/types";
+import { getAllPolicies, getPolicyInvestorCount, getPolicyPendingTotal, type OnChainPolicy } from "@/lib/near/contracts";
+import { MOCK_POLICIES } from "@/lib/mock/policies";
 
-const PROJECTS: ProjectMeta[] = [
-  // ── Status: Upcoming ──
-  {
-    slug: "walrus",
-    name: "Walrus",
-    ticker: "W",
-    chain: "SUI",
-    description: "A decentralized storage and data availability protocol designed for large binary files on Sui.",
-    status: "Upcoming",
-    saleInfo: { target: "$4,500,000" },
-    opens: "2026-04-22T00:00:00Z",
-    closes: "2026-04-28T00:00:00Z",
-    audiences: ["Long-term Conviction Holder", "Ecosystem Builder / Dev"],
-  },
-  // ── Status: Subscription ──
-  {
-    slug: "momentum",
-    name: "Momentum",
-    ticker: "MMT",
-    chain: "SUI",
-    description: "The leading concentrated liquidity DEX on Sui, delivering top APRs for liquidity providers.",
-    status: "Subscription",
-    saleInfo: { target: "$4,500,000", totalSubscription: "$2,340,000", progress: 52, subscribers: "3,841" },
-    audiences: ["Long-term Conviction Holder", "Crypto KOL / Influencer"],
-  },
-  // ── Status: Review ──
-  {
-    slug: "cetus",
-    name: "Cetus Protocol",
-    ticker: "CETUS",
-    chain: "SUI",
-    description: "A pioneer DEX and concentrated liquidity protocol on Sui and Aptos with advanced market making.",
-    status: "Review",
-    saleInfo: { target: "$3,200,000", totalSubscription: "$5,100,000", progress: 159, subscribers: "6,720" },
-  },
-  // ── Status: Contribution ──
-  {
-    slug: "bucket",
-    name: "Bucket Protocol",
-    ticker: "BUCK",
-    chain: "SUI",
-    description: "A CDP protocol on Sui providing stablecoin BUCK and yield strategies for DeFi composability.",
-    status: "Contribution",
-    saleInfo: { target: "$2,800,000", totalSubscription: "$12,600,000", progress: 450, subscribers: "9,150" },
-  },
-  // ── Status: Settlement ──
-  {
-    slug: "navi-protocol",
-    name: "NAVI Protocol",
-    ticker: "NAVX",
-    chain: "SUI",
-    description: "Native one-stop liquidity protocol on Sui. Lend, borrow, and earn with deep capital efficiency.",
-    status: "Settlement",
-    saleInfo: { target: "$3,000,000", totalSubscription: "$45,000,000", progress: 1500, currentPrice: "$0.124", volume24h: "$8.4M", subscribers: "12,483" },
-  },
-  // ── Status: Refund ──
-  {
-    slug: "scallop",
-    name: "Scallop",
-    ticker: "SCA",
-    chain: "SUI",
-    description: "The next-gen money market on Sui with institutional-grade lending and borrowing infrastructure.",
-    status: "Refund",
-    saleInfo: { target: "$2,500,000", totalSubscription: "$38,000,000", progress: 1520, currentPrice: "$0.089", volume24h: "$5.2M", subscribers: "10,340" },
-  },
-  // ── Status: Claim ──
-  {
-    slug: "turbos",
-    name: "Turbos Finance",
-    ticker: "TURBOS",
-    chain: "SUI",
-    description: "A next-gen DEX on Sui offering perpetuals, spot trading, and concentrated liquidity pools.",
-    status: "Claim",
-    saleInfo: { target: "$1,500,000", totalSubscription: "$22,000,000", progress: 1467, currentPrice: "$0.042", volume24h: "$3.1M", subscribers: "7,890" },
-  },
-  // ── Status: Closed ──
-  {
-    slug: "aurora",
-    name: "Aurora",
-    ticker: "AURORA",
+function policyToStatus(policy: OnChainPolicy): Status {
+  switch (policy.status) {
+    case "Upcoming": return "Upcoming";
+    case "Subscribing": return "Subscription";
+    case "Live": return "Settlement";
+    case "Closed": return "Closed";
+  }
+}
+
+function formatNear(yocto: string): string {
+  const near = Number(BigInt(yocto) / BigInt(10 ** 21)) / 1000;
+  return near.toLocaleString(undefined, { maximumFractionDigits: 0 });
+}
+
+function policyToProject(policy: OnChainPolicy, subscribers: number, pendingTotal: string): ProjectMeta {
+  const target = formatNear(policy.sale_config.total_allocation);
+  const contributed = formatNear(pendingTotal);
+  const totalAlloc = Number(BigInt(policy.sale_config.total_allocation));
+  const totalPending = Number(BigInt(pendingTotal));
+  const progress = totalAlloc > 0 ? Math.round((totalPending / totalAlloc) * 100) : 0;
+
+  return {
+    slug: `policy-${policy.id}`,
+    name: policy.natural_language.slice(0, 40) + (policy.natural_language.length > 40 ? "..." : ""),
+    ticker: `P${policy.id}`,
     chain: "NEAR",
-    description: "EVM-compatible layer on NEAR Protocol enabling seamless Ethereum dApp deployment.",
-    status: "Closed",
-    saleInfo: { target: "$2,000,000", totalRaised: "$81.1M", subscribers: "8,920", finalPrice: "$0.087" },
-  },
-];
+    description: policy.natural_language,
+    status: policyToStatus(policy),
+    saleInfo: {
+      target: `${target} NEAR`,
+      totalSubscription: `${contributed} NEAR`,
+      progress,
+      subscribers: subscribers.toString(),
+    },
+  };
+}
 
-export default function HomePage() {
+function mockToProject(mock: typeof MOCK_POLICIES[number]): ProjectMeta {
+  return {
+    slug: `policy-${mock.id}`,
+    name: mock.natural_language.slice(0, 40) + "...",
+    ticker: `P${mock.id}`,
+    chain: "NEAR",
+    description: mock.natural_language,
+    status: mock.status === "Upcoming" ? "Upcoming" : mock.status === "Subscribing" ? "Subscription" : mock.status === "Live" ? "Settlement" : "Closed",
+    saleInfo: {
+      target: mock.sale_config.total_allocation,
+      subscribers: mock.subscribers?.toString(),
+      totalSubscription: mock.total_contributed,
+      progress: mock.progress,
+    },
+  };
+}
+
+export default async function HomePage() {
+  let projects: ProjectMeta[];
+
+  try {
+    const policies = await getAllPolicies();
+    if (policies.length > 0) {
+      const enriched = await Promise.all(
+        policies.map(async (p) => {
+          const [subscribers, pending] = await Promise.all([
+            getPolicyInvestorCount(p.id),
+            getPolicyPendingTotal(p.id),
+          ]);
+          return policyToProject(p, subscribers, pending);
+        }),
+      );
+      projects = enriched;
+    } else {
+      projects = MOCK_POLICIES.map(mockToProject);
+    }
+  } catch {
+    projects = MOCK_POLICIES.map(mockToProject);
+  }
+
   return (
     <>
       <Header />
@@ -105,7 +96,7 @@ export default function HomePage() {
             </p>
           </div>
         </section>
-        <FilterTabs projects={PROJECTS} />
+        <FilterTabs projects={projects} />
       </main>
     </>
   );
