@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import ProjectHero from "@/components/ProjectHero";
+import { useWallet } from "@/contexts/WalletContext";
+import { registerPolicy, parseNearAmount } from "@/lib/near/transactions";
 
 interface Criterion {
   id: string;
@@ -29,6 +31,7 @@ const DEFAULT_EXTERNAL: Criterion[] = [
 ];
 
 export default function EvaluationCriteriaPage() {
+  const { selector } = useWallet();
   const [internalCriteria, setInternalCriteria] = useState(DEFAULT_INTERNAL);
   const [externalCriteria] = useState(DEFAULT_EXTERNAL);
 
@@ -60,11 +63,31 @@ export default function EvaluationCriteriaPage() {
     if (end <= start + 3600000) return alert("Subscription end must be >1hr after start");
     if (live <= end) return alert("Live end must be after subscription end");
 
+    if (!selector) return alert("Connect wallet first");
+
     setIsPublishing(true);
-    // Mock: register_policy contract call
-    await new Promise((r) => setTimeout(r, 2000));
-    setIsPublishing(false);
-    alert(`Mock: register_policy called\n\nnatural_language (${naturalLanguage.length} chars):\n${naturalLanguage.slice(0, 200)}...\n\nSaleConfig:\ntoken=${tokenContract}\nallocation=${totalAllocation}\nprice=${pricePerToken}\nstart=${subscriptionStart}\nend=${subscriptionEnd}\nlive_end=${liveEnd}`);
+    try {
+      const wallet = await selector.wallet("my-near-wallet");
+      // Convert datetime-local to nanoseconds for NEAR
+      const startNs = new Date(subscriptionStart).getTime() * 1_000_000;
+      const endNs = new Date(subscriptionEnd).getTime() * 1_000_000;
+      const liveNs = new Date(liveEnd).getTime() * 1_000_000;
+
+      await registerPolicy(wallet, naturalLanguage, "bafybeibwzifw52ttrkqlikfzext5akxu7lz4xiwjgwzmqcpdzmp3n5mbdq", {
+        token_contract: tokenContract,
+        total_allocation: parseNearAmount(totalAllocation),
+        price_per_token: parseNearAmount(pricePerToken),
+        payment_token: "Near",
+        subscription_start: startNs,
+        subscription_end: endNs,
+        live_end: liveNs,
+      });
+      alert("Policy registered successfully!");
+    } catch (err) {
+      alert(`Failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setIsPublishing(false);
+    }
   }
 
   function toggleCriterion(id: string) {

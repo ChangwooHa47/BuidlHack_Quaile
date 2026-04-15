@@ -4,6 +4,8 @@ import Link from "next/link";
 import StatusBadge from "@/components/StatusBadge";
 import StatusStepper from "@/components/StatusStepper";
 import ProjectHero from "@/components/ProjectHero";
+import { useWallet } from "@/contexts/WalletContext";
+import { advanceStatus, settle } from "@/lib/near/transactions";
 
 const PROJECT = {
   name: "Momentum",
@@ -40,7 +42,23 @@ const PROJECT = {
 };
 
 export default function CompanyDashboard() {
+  const { selector } = useWallet();
   const canAdvance = PROJECT.phase === "Subscribing";
+  const POLICY_ID = 0; // TODO: dynamic from URL/state
+
+  async function handleAdvance() {
+    if (!selector) return;
+    const wallet = await selector.wallet("my-near-wallet");
+    await advanceStatus(wallet, POLICY_ID);
+    window.location.reload();
+  }
+
+  async function handleSettle() {
+    if (!selector) return;
+    const wallet = await selector.wallet("my-near-wallet");
+    await settle(wallet, POLICY_ID);
+    window.location.reload();
+  }
 
   return (
     <main className="flex-1 bg-gray-50">
@@ -225,11 +243,11 @@ export default function CompanyDashboard() {
               Edit Criteria
             </Link>
             {canAdvance && (
-              <button onClick={() => alert("Mock: advance_status → Live")} className="flex h-[47px] w-full items-center justify-center rounded-[10px] border border-alpha-12 bg-gray-200 text-base font-medium text-alpha-60 transition-colors hover:bg-alpha-8">
+              <button onClick={handleAdvance} className="flex h-[47px] w-full items-center justify-center rounded-[10px] border border-alpha-12 bg-gray-200 text-base font-medium text-alpha-60 transition-colors hover:bg-alpha-8">
                 Advance to Live
               </button>
             )}
-            <button onClick={() => alert("Mock: settle()")} className="flex h-[47px] w-full items-center justify-center rounded-[10px] border border-alpha-12 bg-gray-200 text-base font-medium text-alpha-60 transition-colors hover:bg-alpha-8">
+            <button onClick={handleSettle} className="flex h-[47px] w-full items-center justify-center rounded-[10px] border border-alpha-12 bg-gray-200 text-base font-medium text-alpha-60 transition-colors hover:bg-alpha-8">
               Start Settlement
             </button>
           </div>
