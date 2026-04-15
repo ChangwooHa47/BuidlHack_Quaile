@@ -153,3 +153,37 @@ export async function settle(
     ],
   });
 }
+
+export async function claim(wallet: Wallet, policyId: number) {
+  return wallet.signAndSendTransaction({
+    receiverId: CONTRACT_IDS.idoEscrow,
+    actions: [
+      {
+        type: "FunctionCall",
+        params: {
+          methodName: "claim",
+          args: { policy_id: policyId },
+          gas: "100000000000000",
+          deposit: "0",
+        },
+      },
+    ],
+  });
+}
+
+export async function refund(wallet: Wallet, policyId: number) {
+  return wallet.signAndSendTransaction({
+    receiverId: CONTRACT_IDS.idoEscrow,
+    actions: [
+      {
+        type: "FunctionCall",
+        params: {
+          methodName: "refund",
+          args: { policy_id: policyId },
+          gas: "100000000000000",
+          deposit: "0",
+        },
+      },
+    ],
+  });
+}

@@ -105,12 +105,17 @@ export default async function ProjectDetailPage({
                 </div>
               </section>
 
-              {/* Eligibility Criteria */}
+              {/* Eligibility Criteria (External — visible to investors) */}
               <section className="rounded-xl border border-border bg-surface p-lg">
-                <h3 className="mb-sm text-sm font-semibold text-gray-1000">Eligibility Criteria</h3>
-                <p className="whitespace-pre-line text-sm leading-relaxed text-gray-700">
-                  {policy.natural_language}
-                </p>
+                <h3 className="mb-sm text-sm font-semibold text-gray-1000">Evaluation Criteria</h3>
+                <ul className="space-y-xs">
+                  {policy.natural_language.split("\n").filter((l) => l.trim()).map((line, i) => (
+                    <li key={i} className="flex items-start gap-xs text-sm text-gray-700">
+                      <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-neon-glow" />
+                      {line.replace(/^\s*-\s*/, "")}
+                    </li>
+                  ))}
+                </ul>
               </section>
             </div>
 
