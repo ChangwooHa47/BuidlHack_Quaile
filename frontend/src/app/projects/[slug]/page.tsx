@@ -2,6 +2,7 @@ import Header from "@/components/Header";
 import StatusBadge from "@/components/StatusBadge";
 import SubscribingSidebar from "@/components/SubscribingSidebar";
 import { getAllPolicies, getPolicyInvestorCount, getPolicyPendingTotal } from "@/lib/near/contracts";
+import { publicMainLines } from "@/lib/criteria";
 import { notFound } from "next/navigation";
 
 function slugify(name: string): string {
@@ -107,17 +108,28 @@ export default async function ProjectDetailPage({
                 </div>
               </section>
 
-              {/* Eligibility Criteria (External — visible to investors) */}
+              {/* Eligibility Criteria (External — visible to investors).
+                  Only the `main` statement of publicly-visible groups is
+                  surfaced; sub-bullets and hidden groups are filtered out
+                  by `publicMainLines` to prevent gaming the evaluation. */}
               <section className="rounded-xl border border-border bg-surface p-lg">
                 <h3 className="mb-sm text-sm font-semibold text-gray-1000">Evaluation Criteria</h3>
-                <ul className="space-y-xs">
-                  {policy.natural_language.split("\n").filter((l) => l.trim()).map((line, i) => (
-                    <li key={i} className="flex items-start gap-xs text-sm text-gray-700">
-                      <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-neon-glow" />
-                      {line.replace(/^\s*-\s*/, "")}
-                    </li>
-                  ))}
-                </ul>
+                {(() => {
+                  const lines = publicMainLines(policy.natural_language);
+                  if (lines.length === 0) {
+                    return <p className="text-sm text-gray-500">No public criteria published.</p>;
+                  }
+                  return (
+                    <ul className="space-y-xs">
+                      {lines.map((line, i) => (
+                        <li key={i} className="flex items-start gap-xs text-sm text-gray-700">
+                          <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-neon-glow" />
+                          {line}
+                        </li>
+                      ))}
+                    </ul>
+                  );
+                })()}
               </section>
             </div>
 

@@ -7,14 +7,9 @@ import { useWallet } from "@/contexts/WalletContext";
 import { getAllPolicies, type OnChainPolicy } from "@/lib/near/contracts";
 import { slugOf } from "@/lib/slug";
 import { updatePolicy } from "@/lib/near/transactions";
+import { parseCriteria, serializeCriteria, type CriteriaGroup } from "@/lib/criteria";
 import AddCriteriaModal from "@/components/AddCriteriaModal";
 import StatusBadge from "@/components/StatusBadge";
-
-interface CriteriaGroup {
-  main: string;
-  sub: string[];
-  externalVisible: boolean;
-}
 
 export default function AdminCriteriaPage() {
   const params = useParams();
@@ -37,8 +32,7 @@ export default function AdminCriteriaPage() {
         if (cancelled) return;
         setPolicy(p);
         if (p?.natural_language) {
-          const lines = p.natural_language.split("\n").filter((l) => l.trim());
-          setCriteria([{ main: lines[0] || "", sub: lines.slice(1), externalVisible: true }]);
+          setCriteria(parseCriteria(p.natural_language));
         }
       } catch { /* ignore */ }
       if (!cancelled) setLoading(false);
@@ -70,9 +64,7 @@ export default function AdminCriteriaPage() {
     try {
       const wallet = await selector.wallet("my-near-wallet");
 
-      const naturalLanguage = criteria
-        .flatMap((g) => [g.main, ...g.sub.map((s) => `  - ${s}`)])
-        .join("\n");
+      const naturalLanguage = serializeCriteria(criteria);
 
       await updatePolicy(
         wallet,

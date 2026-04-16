@@ -7,13 +7,8 @@ import { useWallet } from "@/contexts/WalletContext";
 import { getAllPolicies } from "@/lib/near/contracts";
 import { registerPolicy } from "@/lib/near/transactions";
 import { slugOf } from "@/lib/slug";
+import { serializeCriteria, type CriteriaGroup } from "@/lib/criteria";
 import AddCriteriaModal from "@/components/AddCriteriaModal";
-
-interface CriteriaGroup {
-  main: string;
-  sub: string[];
-  externalVisible: boolean;
-}
 
 const CHAIN_OPTIONS = ["NEAR", "ETH", "SOL", "BTC", "ARB", "BASE", "OP", "POLY", "BSC"] as const;
 const DEFAULT_LOGO = "https://placehold.co/128";
@@ -130,9 +125,7 @@ export default function AdminNewPolicyPage() {
     try {
       const wallet = await selector.wallet("my-near-wallet");
 
-      const naturalLanguage = criteria
-        .flatMap((g) => [g.main, ...g.sub.map((s) => `  - ${s}`)])
-        .join("\n");
+      const naturalLanguage = serializeCriteria(criteria);
 
       await registerPolicy(
         wallet,
