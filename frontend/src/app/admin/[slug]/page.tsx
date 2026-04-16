@@ -132,10 +132,13 @@ export default function AdminProjectPage() {
               <KpiCard label="Target" value={`${target} NEAR`} />
             </div>
 
-            {/* Timeline */}
+            {/* Sale Info */}
             <div className="rounded-[14px] border border-alpha-12 bg-gray-200 p-lg">
-              <h3 className="text-base font-medium text-gray-1000">Timeline</h3>
+              <h3 className="text-base font-medium text-gray-1000">Sale Info</h3>
               <div className="mt-md space-y-[10px]">
+                <TimeRow label="Token Contract" value={policy.sale_config.token_contract} />
+                <TimeRow label="Total Allocation" value={policy.sale_config.total_allocation} />
+                <TimeRow label="Price per Token" value={policy.sale_config.price_per_token} />
                 <TimeRow label="Subscription Start" value={formatDate(policy.sale_config.subscription_start)} />
                 <TimeRow label="Subscription End" value={formatDate(policy.sale_config.subscription_end)} />
                 <TimeRow label="Live End" value={formatDate(policy.sale_config.live_end)} />

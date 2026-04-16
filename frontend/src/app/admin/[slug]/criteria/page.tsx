@@ -6,16 +6,9 @@ import { useParams, useRouter } from "next/navigation";
 import { useWallet } from "@/contexts/WalletContext";
 import { getAllPolicies, type OnChainPolicy } from "@/lib/near/contracts";
 import { slugOf } from "@/lib/slug";
-import { registerPolicy, updatePolicy } from "@/lib/near/transactions";
+import { updatePolicy } from "@/lib/near/transactions";
 import AddCriteriaModal from "@/components/AddCriteriaModal";
 import StatusBadge from "@/components/StatusBadge";
-
-// Convert a nanosecond timestamp into the value shape a <input type="datetime-local"> expects.
-function nsToDatetimeLocal(ns: number): string {
-  const d = new Date(ns / 1_000_000);
-  const pad = (n: number) => n.toString().padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
 
 interface CriteriaGroup {
   main: string;
@@ -32,18 +25,8 @@ export default function AdminCriteriaPage() {
   const [policy, setPolicy] = useState<OnChainPolicy | null>(null);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [isPublishing, setIsPublishing] = useState(false);
-
-  // Internal criteria (main + sub-criteria from LLM)
+  const [isSaving, setIsSaving] = useState(false);
   const [criteria, setCriteria] = useState<CriteriaGroup[]>([]);
-
-  // Sale config state (for new policies)
-  const [tokenContract, setTokenContract] = useState("mockft.rockettheraccon.testnet");
-  const [totalAllocation, setTotalAllocation] = useState("1000000000000000000000000000");
-  const [pricePerToken, setPricePerToken] = useState("500000000000000000000000");
-  const [subscriptionStart, setSubscriptionStart] = useState("");
-  const [subscriptionEnd, setSubscriptionEnd] = useState("");
-  const [liveEnd, setLiveEnd] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -56,14 +39,6 @@ export default function AdminCriteriaPage() {
         if (p?.natural_language) {
           const lines = p.natural_language.split("\n").filter((l) => l.trim());
           setCriteria([{ main: lines[0] || "", sub: lines.slice(1), externalVisible: true }]);
-        }
-        if (p) {
-          setTokenContract(p.sale_config.token_contract);
-          setTotalAllocation(p.sale_config.total_allocation);
-          setPricePerToken(p.sale_config.price_per_token);
-          setSubscriptionStart(nsToDatetimeLocal(p.sale_config.subscription_start));
-          setSubscriptionEnd(nsToDatetimeLocal(p.sale_config.subscription_end));
-          setLiveEnd(nsToDatetimeLocal(p.sale_config.live_end));
         }
       } catch { /* ignore */ }
       if (!cancelled) setLoading(false);
@@ -88,69 +63,43 @@ export default function AdminCriteriaPage() {
     );
   }
 
-  async function handlePublish() {
-    if (!selector || criteria.length === 0) return;
-    if (!subscriptionStart || !subscriptionEnd || !liveEnd) {
-      alert("Fill all date fields.");
-      return;
-    }
+  async function handleSave() {
+    if (!selector || !policy || criteria.length === 0) return;
 
-    setIsPublishing(true);
+    setIsSaving(true);
     try {
       const wallet = await selector.wallet("my-near-wallet");
 
-      // Combine criteria into natural_language
       const naturalLanguage = criteria
         .flatMap((g) => [g.main, ...g.sub.map((s) => `  - ${s}`)])
         .join("\n");
 
-      const startNs = new Date(subscriptionStart).getTime() * 1_000_000;
-      const endNs = new Date(subscriptionEnd).getTime() * 1_000_000;
-      const liveNs = new Date(liveEnd).getTime() * 1_000_000;
-
-      const saleConfig = {
-        token_contract: tokenContract,
-        total_allocation: totalAllocation,
-        price_per_token: pricePerToken,
-        payment_token: "Near" as const,
-        subscription_start: startNs,
-        subscription_end: endNs,
-        live_end: liveNs,
-      };
-
-      if (policy) {
-        await updatePolicy(
-          wallet,
-          policy.id,
-          policy.name,
-          policy.ticker,
-          policy.description,
-          policy.chain,
-          policy.logo_url,
-          naturalLanguage,
-          policy.ipfs_cid,
-          saleConfig,
-        );
-        alert("Policy updated!");
-      } else {
-        await registerPolicy(
-          wallet,
-          "New Project",
-          "TKN",
-          "A new project on Qualie.",
-          "NEAR",
-          "https://placehold.co/128",
-          naturalLanguage,
-          "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3ocirgf5de2yjvei",
-          saleConfig,
-        );
-        alert("Policy published!");
-      }
-      router.push("/admin");
+      await updatePolicy(
+        wallet,
+        policy.id,
+        policy.name,
+        policy.ticker,
+        policy.description,
+        policy.chain,
+        policy.logo_url,
+        naturalLanguage,
+        policy.ipfs_cid,
+        {
+          token_contract: policy.sale_config.token_contract,
+          total_allocation: policy.sale_config.total_allocation,
+          price_per_token: policy.sale_config.price_per_token,
+          payment_token: policy.sale_config.payment_token,
+          subscription_start: policy.sale_config.subscription_start,
+          subscription_end: policy.sale_config.subscription_end,
+          live_end: policy.sale_config.live_end,
+        },
+      );
+      alert("Criteria updated!");
+      router.push(`/admin/${slug}`);
     } catch (err) {
       alert(`Failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
-      setIsPublishing(false);
+      setIsSaving(false);
     }
   }
 
@@ -158,6 +107,10 @@ export default function AdminCriteriaPage() {
 
   if (loading) {
     return <main className="flex-1 bg-gray-50"><div className="mx-auto max-w-[1440px] px-[80px] py-[56px]"><div className="h-64 animate-pulse rounded-[14px] bg-gray-200" /></div></main>;
+  }
+
+  if (!policy) {
+    return <main className="flex-1 bg-gray-50"><div className="mx-auto max-w-[1440px] px-[80px] py-[56px]"><p className="text-alpha-40">Policy not found.</p></div></main>;
   }
 
   return (
@@ -168,7 +121,7 @@ export default function AdminCriteriaPage() {
           <Link href="/admin" className="text-alpha-40 hover:text-alpha-60 transition-colors">Your Projects</Link>
           <span className="text-alpha-40">&rsaquo;</span>
           <Link href={`/admin/${slug}`} className="text-alpha-40 hover:text-alpha-60 transition-colors">
-            {policy?.name || slug}
+            {policy.name}
           </Link>
           <span className="text-alpha-40">&rsaquo;</span>
           <span className="text-alpha-60">Evaluation Criteria</span>
@@ -176,12 +129,12 @@ export default function AdminCriteriaPage() {
 
         <div className="mt-lg flex items-center justify-between">
           <h1 className="text-[24px] font-medium text-gray-1000">Evaluation Criteria</h1>
-          {policy && <StatusBadge phase={policy.status} />}
+          <StatusBadge phase={policy.status} />
         </div>
 
         {isLocked && (
           <div className="mt-md rounded-[10px] border border-status-refund/30 bg-status-refund/5 px-md py-sm text-sm text-status-refund">
-            Criteria are locked — policy is {policy?.status}. Changes cannot be made.
+            Criteria are locked — policy is {policy.status}. Changes cannot be made.
           </div>
         )}
 
@@ -263,32 +216,15 @@ export default function AdminCriteriaPage() {
           </div>
         </div>
 
-        {/* Sale Config (for new policies or Upcoming) */}
-        {!isLocked && (
-          <div className="mt-xl">
-            <h2 className="text-[24px] font-medium text-gray-1000">Sale Configuration</h2>
-            <div className="mt-lg grid grid-cols-3 gap-md">
-              <SaleField label="Token Contract" value={tokenContract} onChange={setTokenContract} />
-              <SaleField label="Total Allocation" value={totalAllocation} onChange={setTotalAllocation} />
-              <SaleField label="Price per Token" value={pricePerToken} onChange={setPricePerToken} />
-              <SaleField label="Subscription Start" value={subscriptionStart} onChange={setSubscriptionStart} type="datetime-local" />
-              <SaleField label="Subscription End" value={subscriptionEnd} onChange={setSubscriptionEnd} type="datetime-local" />
-              <SaleField label="Live End" value={liveEnd} onChange={setLiveEnd} type="datetime-local" />
-            </div>
-          </div>
-        )}
-
         {/* Actions */}
         {!isLocked && (
           <div className="mt-xl flex justify-end">
             <button
-              onClick={handlePublish}
-              disabled={isPublishing || criteria.length === 0}
+              onClick={handleSave}
+              disabled={isSaving || criteria.length === 0}
               className="rounded-xl bg-neon-glow px-[28px] py-[16px] text-base font-medium text-gray-0 transition-colors hover:bg-neon-soft disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {isPublishing
-                ? policy ? "Saving..." : "Publishing..."
-                : policy ? "Save Changes" : "Publish Policy"}
+              {isSaving ? "Saving..." : "Save Changes"}
             </button>
           </div>
         )}
@@ -301,21 +237,5 @@ export default function AdminCriteriaPage() {
         />
       )}
     </main>
-  );
-}
-
-function SaleField({ label, value, onChange, type = "text" }: {
-  label: string; value: string; onChange: (v: string) => void; type?: string;
-}) {
-  return (
-    <div>
-      <label className="mb-xs block text-xs font-medium text-alpha-40">{label}</label>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-[10px] border border-alpha-12 bg-gray-150 px-md py-sm text-sm text-gray-1000 placeholder:text-alpha-20 focus:border-neon-glow/40 focus:outline-none"
-      />
-    </div>
   );
 }
