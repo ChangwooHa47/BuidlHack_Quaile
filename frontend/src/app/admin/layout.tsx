@@ -102,6 +102,14 @@ export default function AdminLayout({
             })}
           </div>
 
+          <Link
+            href="/admin/new"
+            className="mt-sm flex items-center gap-sm rounded-lg px-sm py-[10px] text-sm text-alpha-40 hover:bg-alpha-8 hover:text-gray-1000 transition-colors"
+          >
+            <span className="flex h-6 w-6 items-center justify-center rounded-md border border-dashed border-alpha-20 text-[10px] text-alpha-40">+</span>
+            New Project
+          </Link>
+
           {/* Project sub-nav */}
           {isProjectSubpage && currentPolicy && (
             <>

@@ -28,7 +28,15 @@ export default function AdminPage() {
   return (
     <main className="flex-1 bg-gray-50">
       <div className="mx-auto max-w-[1440px] px-[80px] py-[56px]">
-        <h1 className="text-[28px] font-medium text-gray-1000">Your Projects</h1>
+        <div className="flex items-center justify-between gap-md">
+          <h1 className="text-[28px] font-medium text-gray-1000">Your Projects</h1>
+          <Link
+            href="/admin/new"
+            className="rounded-[10px] bg-neon-glow px-lg py-sm text-sm font-medium text-gray-0 hover:bg-neon-soft transition-colors"
+          >
+            + New Project
+          </Link>
+        </div>
 
         {!isConnected && (
           <p className="mt-lg text-sm text-alpha-40">Connect your wallet to view your projects.</p>
