@@ -32,10 +32,11 @@ export async function viewCall<T>(
   if (data.error) {
     throw new Error(`RPC error: ${JSON.stringify(data.error)}`);
   }
-  if (!data.result?.result) {
-    throw new Error(`RPC: no result for ${contractId}.${method}`);
+  const raw = data.result?.result;
+  if (!Array.isArray(raw) || raw.length === 0) {
+    throw new Error(`RPC: empty result for ${contractId}.${method}`);
   }
 
-  const bytes = new Uint8Array(data.result.result);
-  return JSON.parse(new TextDecoder().decode(bytes));
+  const text = new TextDecoder().decode(new Uint8Array(raw));
+  return JSON.parse(text);
 }

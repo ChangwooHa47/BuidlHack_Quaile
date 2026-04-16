@@ -2,6 +2,7 @@ import Header from "@/components/Header";
 import FilterTabs from "@/components/FilterTabs";
 import type { ProjectMeta } from "@/types";
 import { getAllPolicies, getPolicyInvestorCount, getPolicyPendingTotal, type OnChainPolicy } from "@/lib/near/contracts";
+import { slugOf } from "@/lib/slug";
 
 function formatNear(yocto: string): string {
   const near = Number(BigInt(yocto) / BigInt(10 ** 21)) / 1000;
@@ -16,7 +17,7 @@ function policyToProject(policy: OnChainPolicy, subscribers: number, pendingTota
   const progress = totalAlloc > 0 ? Math.round((totalPending / totalAlloc) * 100) : 0;
 
   return {
-    slug: policy.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+$/, ""),
+    slug: slugOf(policy.name),
     name: policy.name,
     ticker: policy.ticker,
     chain: policy.chain,

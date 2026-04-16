@@ -5,6 +5,7 @@ import Link from "next/link";
 import StatusBadge from "@/components/StatusBadge";
 import { useWallet } from "@/contexts/WalletContext";
 import { getAllPolicies, type OnChainPolicy } from "@/lib/near/contracts";
+import { slugOf } from "@/lib/slug";
 
 export default function AdminPage() {
   const { accountId, isConnected } = useWallet();
@@ -56,7 +57,7 @@ export default function AdminPage() {
             {policies.map((p) => (
               <Link
                 key={p.id}
-                href={`/admin/policy-${p.id}`}
+                href={`/admin/${slugOf(p.name)}`}
                 className="flex items-center justify-between rounded-[14px] border border-alpha-12 bg-gray-200 p-lg transition-colors hover:border-alpha-20"
               >
                 <div className="flex items-center gap-md">
@@ -65,7 +66,7 @@ export default function AdminPage() {
                   </div>
                   <div>
                     <p className="text-base font-medium text-gray-1000">{p.name}</p>
-                    <p className="text-xs text-alpha-40">{p.ticker} · {p.chain} · Policy #{p.id}</p>
+                    <p className="text-xs text-alpha-40">{p.ticker} · {p.chain}</p>
                   </div>
                 </div>
                 <StatusBadge phase={p.status} />

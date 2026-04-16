@@ -1,6 +1,6 @@
 const STEPS = [
   "Subscription",
-  "Review",
+  "Pending",
   "Contribution",
   "Settlement",
   "Refund",

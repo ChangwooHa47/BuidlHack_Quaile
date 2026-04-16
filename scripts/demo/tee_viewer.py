@@ -71,18 +71,11 @@ async def collect_real_signals(evm_address: str) -> AggregatedSignalModel:
     from ingest.chains import SUPPORTED_CHAINS
     from ingest.evm import EvmIngestor
 
-    # Use configured chains, fill in public RPC fallbacks for any without RPC
     from ingest.chains import ChainConfig
-    PUBLIC_RPCS = {
-        1: "https://eth.drpc.org",
-        42161: "https://arb1.arbitrum.io/rpc",
-        137: "https://polygon-rpc.com",
+    chains_with_rpc = {
+        1: ChainConfig(1, "ethereum", "https://eth.drpc.org", "https://api.etherscan.io/v2/api", "ETHERSCAN_API_KEY"),
+        42161: ChainConfig(42161, "arbitrum", "https://arb1.arbitrum.io/rpc", "https://api.etherscan.io/v2/api", "ETHERSCAN_API_KEY"),
     }
-    chains_with_rpc = {}
-    for cid, c in SUPPORTED_CHAINS.items():
-        rpc = c.rpc or PUBLIC_RPCS.get(cid)
-        if rpc:
-            chains_with_rpc[cid] = ChainConfig(cid, c.name, rpc, c.explorer_api, c.etherscan_api_key_env)
 
     ingestor = EvmIngestor(chains_with_rpc)
 
@@ -260,7 +253,7 @@ DEFAULT_POLICY = (
     "Evaluation criteria for this IDO:\n"
     "1. Wallet must have at least 1 on-chain transaction on Ethereum mainnet\n"
     "2. Wallet age must exceed 90 days (first transaction older than 90 days)\n"
-    "3. Must have on-chain activity on 2 or more EVM chains\n"
+    "3. Total transaction count across all chains must exceed 10\n"
     "4. Must have participated in DAO governance voting at least 3 times\n"
     "5. Must have deployed a smart contract on any EVM chain"
 )

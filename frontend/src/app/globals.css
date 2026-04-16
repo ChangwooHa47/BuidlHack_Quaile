@@ -21,10 +21,10 @@
   --color-alpha-4: rgba(255, 255, 255, 0.04);
   --color-alpha-8: rgba(255, 255, 255, 0.08);
   --color-alpha-12: rgba(255, 255, 255, 0.12);
-  --color-alpha-20: rgba(255, 255, 255, 0.20);
-  --color-alpha-40: rgba(255, 255, 255, 0.40);
-  --color-alpha-60: rgba(255, 255, 255, 0.60);
-  --color-alpha-80: rgba(255, 255, 255, 0.80);
+  --color-alpha-20: rgba(255, 255, 255, 0.28);
+  --color-alpha-40: rgba(255, 255, 255, 0.55);
+  --color-alpha-60: rgba(255, 255, 255, 0.75);
+  --color-alpha-80: rgba(255, 255, 255, 0.90);
 
   /* Neon Accent */
   --color-neon-glow: #c8ff00;

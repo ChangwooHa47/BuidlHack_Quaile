@@ -1,6 +1,6 @@
 import Link from "next/link";
 import StatusBadge from "./StatusBadge";
-import type { ProjectMeta, Status, Phase } from "@/types";
+import type { ProjectMeta, Status } from "@/types";
 import { phaseOf } from "@/types";
 
 export default function ProjectCard({
@@ -97,7 +97,7 @@ function UpcomingBody({
   );
 }
 
-/* ── Subscribing (Subscription / Review / Contribution) ── */
+/* ── Subscribing (Subscription / Pending / Contribution) ── */
 function SubscribingBody({ saleInfo }: { saleInfo: ProjectMeta["saleInfo"] }) {
   return (
     <div className="space-y-[14px]">
@@ -141,7 +141,7 @@ function CardCTA({ status }: { status: Status }) {
   const config: Record<Status, { label: string; style: string }> = {
     Subscription: { label: "Subscribe",     style: "bg-neon-glow text-gray-0" },
     Upcoming:     { label: "Notify Me",     style: "bg-neon-glow text-gray-0" },
-    Review:       { label: "Reviewing...",  style: "bg-gray-150 text-alpha-40 cursor-default" },
+    Pending:      { label: "Reviewing...",  style: "bg-gray-150 text-alpha-40 cursor-default" },
     Contribution: { label: "Contribute",    style: "bg-neon-glow text-gray-0" },
     Settlement:   { label: "Processing...", style: "bg-gray-150 text-alpha-40 cursor-default" },
     Refund:       { label: "Refund",        style: "bg-gray-1000 text-gray-0" },

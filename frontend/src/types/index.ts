@@ -5,7 +5,7 @@ export type Phase = "Upcoming" | "Subscribing" | "Live" | "Closed";
 export type Status =
   | "Upcoming"
   | "Subscription"
-  | "Review"
+  | "Pending"
   | "Contribution"
   | "Settlement"
   | "Refund"
@@ -17,7 +17,7 @@ export function phaseOf(status: Status): Phase {
   switch (status) {
     case "Upcoming": return "Upcoming";
     case "Subscription":
-    case "Review":
+    case "Pending":
     case "Contribution": return "Subscribing";
     case "Settlement":
     case "Refund":

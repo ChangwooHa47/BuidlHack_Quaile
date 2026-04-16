@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useWallet } from "@/contexts/WalletContext";
-import { getPolicy, type OnChainPolicy } from "@/lib/near/contracts";
+import { getAllPolicies, type OnChainPolicy } from "@/lib/near/contracts";
+import { slugOf } from "@/lib/slug";
 import { registerPolicy } from "@/lib/near/transactions";
 import AddCriteriaModal from "@/components/AddCriteriaModal";
 import StatusBadge from "@/components/StatusBadge";
@@ -19,7 +20,6 @@ export default function AdminCriteriaPage() {
   const params = useParams();
   const router = useRouter();
   const slug = params?.slug as string;
-  const policyId = Number(slug?.replace("policy-", ""));
   const { selector } = useWallet();
 
   const [policy, setPolicy] = useState<OnChainPolicy | null>(null);
@@ -39,18 +39,18 @@ export default function AdminCriteriaPage() {
   const [liveEnd, setLiveEnd] = useState("");
 
   useEffect(() => {
-    getPolicy(policyId)
-      .then((p) => {
+    getAllPolicies()
+      .then((all) => {
+        const p = all.find((x) => slugOf(x.name) === slug) ?? null;
         setPolicy(p);
         if (p?.natural_language) {
-          // Parse existing criteria from natural_language
           const lines = p.natural_language.split("\n").filter((l) => l.trim());
           setCriteria([{ main: lines[0] || "", sub: lines.slice(1), externalVisible: true }]);
         }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [policyId]);
+  }, [slug]);
 
   function handleAddCriteria(main: string, sub: string[]) {
     setCriteria((prev) => [...prev, { main, sub, externalVisible: true }]);
@@ -128,8 +128,8 @@ export default function AdminCriteriaPage() {
         <div className="flex items-center gap-2 text-sm font-medium">
           <Link href="/admin" className="text-alpha-40 hover:text-alpha-60 transition-colors">Your Projects</Link>
           <span className="text-alpha-40">&rsaquo;</span>
-          <Link href={`/admin/policy-${policyId}`} className="text-alpha-40 hover:text-alpha-60 transition-colors">
-            {policy?.name || `Policy #${policyId}`}
+          <Link href={`/admin/${slug}`} className="text-alpha-40 hover:text-alpha-60 transition-colors">
+            {policy?.name || slug}
           </Link>
           <span className="text-alpha-40">&rsaquo;</span>
           <span className="text-alpha-60">Evaluation Criteria</span>

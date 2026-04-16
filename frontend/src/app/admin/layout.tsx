@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useWallet } from "@/contexts/WalletContext";
-import ConnectedWallet from "@/components/ConnectedWallet";
-import StatusBadge from "@/components/StatusBadge";
 import { getAllPolicies, type OnChainPolicy } from "@/lib/near/contracts";
+import { slugOf } from "@/lib/slug";
 
 export default function AdminLayout({
   children,
@@ -15,26 +14,51 @@ export default function AdminLayout({
 }) {
   const { accountId, isConnected, isLoading, signIn, signOut } = useWallet();
   const pathname = usePathname();
-  const [policies, setPolicies] = useState<OnChainPolicy[]>([]);
+  const [allPolicies, setAllPolicies] = useState<OnChainPolicy[]>([]);
 
   useEffect(() => {
-    getAllPolicies()
-      .then((all) => {
-        if (accountId) {
-          setPolicies(all.filter((p) => p.foundation === accountId));
-        } else {
-          setPolicies(all);
-        }
-      })
-      .catch(() => {});
-  }, [accountId]);
+    let cancelled = false;
+    (async () => {
+      try {
+        const all = await getAllPolicies();
+        if (!cancelled) setAllPolicies(all);
+      } catch { /* ignore */ }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const policies = useMemo(
+    () => (accountId ? allPolicies.filter((p) => p.foundation === accountId) : []),
+    [allPolicies, accountId],
+  );
+
+  if (!isLoading && !isConnected) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="max-w-sm rounded-2xl border border-alpha-12 bg-gray-100 p-xl text-center">
+          <p className="text-xs font-medium uppercase tracking-wider text-alpha-40">Foundation Console</p>
+          <h1 className="mt-sm text-xl font-semibold tracking-tight text-gray-1000">Connect your wallet</h1>
+          <p className="mt-xs text-sm text-alpha-60">
+            Only the NEAR account that owns a policy can access this page.
+          </p>
+          <button
+            onClick={signIn}
+            className="mt-lg w-full rounded-pill border border-gray-500 py-sm text-sm font-medium text-gray-1000 hover:bg-alpha-8 transition-colors"
+          >
+            Connect Wallet
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Extract current policy slug from path
-  const slugMatch = pathname?.match(/\/admin\/(policy-\d+)/);
-  const currentSlug = slugMatch?.[1];
-  const currentPolicy = policies.find(
-    (p) => `policy-${p.id}` === currentSlug,
-  );
+  const slugMatch = pathname?.match(/\/admin\/([^/]+)/);
+  const currentSlug =
+    slugMatch && slugMatch[1] !== "new" ? slugMatch[1] : undefined;
+  const currentPolicy = policies.find((p) => slugOf(p.name) === currentSlug);
 
   const isProjectSubpage = !!currentSlug;
   const isCriteriaPage = pathname?.endsWith("/criteria");
@@ -57,7 +81,7 @@ export default function AdminLayout({
           </p>
           <div className="mt-xs space-y-0.5">
             {policies.map((p) => {
-              const slug = `policy-${p.id}`;
+              const slug = slugOf(p.name);
               const active = currentSlug === slug;
               return (
                 <Link
