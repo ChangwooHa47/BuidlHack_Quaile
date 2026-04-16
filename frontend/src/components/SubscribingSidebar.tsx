@@ -125,12 +125,22 @@ export default function SubscribingSidebar({ name, ticker, status, policyId, slu
       {/* Flow-based CTA */}
       {flow === "identity" && (
         <div className="space-y-xs">
-          <Link
-            href={`/projects/${slug || "unknown"}/identity`}
-            className="flex w-full items-center justify-center rounded-lg border border-gray-500 py-2.5 text-sm font-medium text-gray-1000 hover:bg-alpha-8 transition-colors"
-          >
-            Edit Identity
-          </Link>
+          {isSubscribing ? (
+            <Link
+              href={`/projects/${slug || "unknown"}/identity`}
+              className="flex w-full items-center justify-center rounded-lg border border-gray-500 py-2.5 text-sm font-medium text-gray-1000 hover:bg-alpha-8 transition-colors"
+            >
+              Build Identity
+            </Link>
+          ) : (
+            <button
+              type="button"
+              disabled
+              className="w-full rounded-lg border border-alpha-12 py-2.5 text-sm font-medium text-alpha-40 cursor-not-allowed"
+            >
+              Build Identity
+            </button>
+          )}
           {isSubscribing && policyId !== undefined && (
             <button
               disabled={!isIdentityComplete}
@@ -139,6 +149,11 @@ export default function SubscribingSidebar({ name, ticker, status, policyId, slu
             >
               {isIdentityComplete ? "Subscribe" : "Complete Identity First"}
             </button>
+          )}
+          {!isSubscribing && (
+            <p className="text-center text-xs text-alpha-60">
+              Identity setup opens during the Subscribing phase.
+            </p>
           )}
         </div>
       )}

@@ -38,9 +38,11 @@ export default function ProjectCard({
       </div>
 
       {/* ── Description ── */}
-      <p className="relative z-10 overflow-hidden px-lg pt-md pb-[20px] text-sm leading-relaxed text-alpha-60" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-        {description}
-      </p>
+      <div className="relative z-10 px-lg pt-md pb-[20px]">
+        <p className="line-clamp-2 text-sm leading-relaxed text-alpha-60">
+          {description}
+        </p>
+      </div>
 
       {/* ── Divider ── */}
       <div className="relative z-10 mx-lg h-px bg-alpha-12" />

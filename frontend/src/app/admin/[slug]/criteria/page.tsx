@@ -127,9 +127,19 @@ export default function AdminCriteriaPage() {
           <span className="text-alpha-60">Evaluation Criteria</span>
         </div>
 
-        <div className="mt-lg flex items-center justify-between">
-          <h1 className="text-[24px] font-medium text-gray-1000">Evaluation Criteria</h1>
-          <StatusBadge phase={policy.status} />
+        <div className="mt-lg flex items-center justify-between gap-md">
+          <div className="flex items-center gap-md">
+            <h1 className="text-[24px] font-medium text-gray-1000">Evaluation Criteria</h1>
+            <StatusBadge phase={policy.status} />
+          </div>
+          {!isLocked && (
+            <button
+              onClick={() => setShowModal(true)}
+              className="flex items-center gap-2 rounded-pill bg-gray-200 px-[14px] py-[10px] text-sm font-medium text-alpha-60 hover:bg-alpha-8 transition-colors"
+            >
+              <span className="text-base">+</span> Add Criteria
+            </button>
+          )}
         </div>
 
         {isLocked && (
@@ -138,81 +148,88 @@ export default function AdminCriteriaPage() {
           </div>
         )}
 
-        {/* Criteria list */}
-        <div className="mt-xl space-y-md">
-          <div className="flex items-center justify-between">
+        {/* Criteria: Internal (editable) ↔ External (preview) */}
+        <div className="mt-xl grid grid-cols-1 gap-lg lg:grid-cols-2">
+          {/* Internal */}
+          <div className="space-y-md">
             <h2 className="text-[20px] font-medium text-gray-1000">
               Internal Criteria
               <span className="ml-sm rounded-pill bg-gray-300 px-2 py-[3px] text-[11px] font-medium text-alpha-60">{criteria.length}</span>
             </h2>
-            {!isLocked && (
-              <button
-                onClick={() => setShowModal(true)}
-                className="flex items-center gap-2 rounded-pill bg-gray-200 px-[14px] py-[10px] text-sm font-medium text-alpha-60 hover:bg-alpha-8 transition-colors"
-              >
-                <span className="text-base">+</span> Add Criteria
-              </button>
-            )}
-          </div>
 
-          {criteria.length === 0 ? (
-            <p className="text-sm text-alpha-40">No criteria yet. Click &ldquo;Add Criteria&rdquo; to start.</p>
-          ) : (
-            criteria.map((group, i) => (
-              <div key={i} className="rounded-[14px] border border-alpha-12 bg-gray-200 p-lg">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <p className="text-base font-medium text-gray-1000">{group.main}</p>
-                    <ul className="mt-sm space-y-xs">
-                      {group.sub.map((s, j) => (
-                        <li key={j} className="flex items-start gap-xs text-sm text-alpha-60">
-                          <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-alpha-40" />
-                          {s}
-                        </li>
-                      ))}
-                    </ul>
+            {criteria.length === 0 ? (
+              <p className="text-sm text-alpha-40">No criteria yet. Click &ldquo;Add Criteria&rdquo; to start.</p>
+            ) : (
+              criteria.map((group, i) => (
+                <div key={i} className="overflow-hidden rounded-[14px] border border-alpha-12 bg-gray-200">
+                  <div className="p-lg">
+                    <div className="flex items-center justify-between gap-sm">
+                      <p className="text-[11px] font-medium uppercase tracking-wider text-alpha-40">
+                        Criteria {i + 1}
+                      </p>
+                      <span
+                        className={`rounded-pill px-sm py-[2px] text-[10px] font-medium uppercase tracking-wider ${
+                          group.externalVisible
+                            ? "bg-neon-glow/10 text-neon-glow"
+                            : "bg-gray-300 text-alpha-40"
+                        }`}
+                      >
+                        {group.externalVisible ? "Public" : "Private"}
+                      </span>
+                    </div>
+                    <p className="mt-sm text-sm font-medium text-gray-1000 leading-relaxed">{group.main}</p>
+                    {group.sub.length > 0 && (
+                      <ul className="mt-md space-y-xs border-t border-alpha-12 pt-md">
+                        {group.sub.map((s, j) => (
+                          <li key={j} className="flex items-start gap-xs text-sm text-alpha-80 leading-relaxed">
+                            <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-neon-glow" />
+                            {s}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                   {!isLocked && (
-                    <div className="flex items-center gap-sm">
+                    <div className="flex items-center justify-end gap-xs border-t border-alpha-12 bg-gray-150 px-lg py-sm">
                       <button
                         onClick={() => toggleExternal(i)}
-                        className={`rounded-pill px-sm py-1 text-xs font-medium transition-colors ${group.externalVisible ? "bg-neon-glow/10 text-neon-glow" : "bg-gray-300 text-alpha-40"}`}
+                        className="rounded-lg px-sm py-1 text-xs font-medium text-alpha-60 hover:bg-alpha-8 hover:text-gray-1000 transition-colors"
                       >
-                        {group.externalVisible ? "Public" : "Hidden"}
+                        {group.externalVisible ? "Make Private" : "Make Public"}
                       </button>
                       <button
                         onClick={() => removeCriteria(i)}
-                        className="text-sm text-alpha-40 hover:text-status-refund transition-colors"
+                        className="rounded-lg px-sm py-1 text-xs font-medium text-alpha-60 hover:bg-alpha-8 hover:text-status-refund transition-colors"
                       >
-                        &times;
+                        Delete
                       </button>
                     </div>
                   )}
                 </div>
-              </div>
-            ))
-          )}
-        </div>
-
-        {/* External preview */}
-        <div className="mt-xl">
-          <h2 className="text-[20px] font-medium text-gray-1000">
-            External Criteria
-            <span className="ml-xs text-sm text-alpha-40">(visible to investors)</span>
-          </h2>
-          <div className="mt-md rounded-[14px] border border-alpha-12 bg-gray-200 p-lg">
-            {criteria.filter((c) => c.externalVisible).length === 0 ? (
-              <p className="text-sm text-alpha-40">No public criteria.</p>
-            ) : (
-              <ul className="space-y-xs">
-                {criteria.filter((c) => c.externalVisible).map((c, i) => (
-                  <li key={i} className="flex items-start gap-xs text-sm text-gray-1000">
-                    <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-neon-glow" />
-                    {c.main}
-                  </li>
-                ))}
-              </ul>
+              ))
             )}
+          </div>
+
+          {/* External */}
+          <div className="space-y-md">
+            <h2 className="text-[20px] font-medium text-gray-1000">
+              External Criteria
+              <span className="ml-xs text-sm text-alpha-40">(visible to investors)</span>
+            </h2>
+            <div className="rounded-[14px] border border-alpha-12 bg-gray-200 p-lg">
+              {criteria.filter((c) => c.externalVisible).length === 0 ? (
+                <p className="text-sm text-alpha-40">No public criteria.</p>
+              ) : (
+                <ul className="space-y-xs">
+                  {criteria.filter((c) => c.externalVisible).map((c, i) => (
+                    <li key={i} className="flex items-start gap-xs text-sm text-gray-1000">
+                      <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-neon-glow" />
+                      {c.main}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
         </div>
 

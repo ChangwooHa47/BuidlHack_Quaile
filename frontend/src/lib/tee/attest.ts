@@ -32,6 +32,8 @@ export interface AttestationResponse {
   zk_input: ZkCircuitInput;
 }
 
+// Nanosecond timestamps exceed JS Number's 2^53 safe range, so they travel
+// as decimal strings over the wire. Pydantic on the TEE side coerces str → int.
 export interface PersonaSubmission {
   near_account: string;
   policy_id: number;
@@ -41,20 +43,20 @@ export interface PersonaSubmission {
       public_key: string;
       signature: string;
       message: string;
-      timestamp: number;
+      timestamp: string;
     }>;
     evm: Array<{
       chain_id: number;
       address: string;
       signature: string;
       message: string;
-      timestamp: number;
+      timestamp: string;
     }>;
   };
   self_intro: string;
   github_oauth_token: string | null;
   nonce: string;
-  client_timestamp: number;
+  client_timestamp: string;
 }
 
 export async function submitPersona(

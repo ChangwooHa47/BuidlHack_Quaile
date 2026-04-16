@@ -27,7 +27,7 @@ export default function PersonaForm({ policyId, onAttestationComplete }: Persona
 
     try {
       const nonce = generateNonce();
-      const clientTs = Number(nowNs());
+      const clientTs = nowNs().toString();
 
       const persona = {
         near_account: accountId,

@@ -14,12 +14,6 @@ export default function Header() {
           Qualie.
         </Link>
 
-        <nav className="flex items-center gap-xl">
-          <Link href="/" className="text-sm font-medium text-gray-800 hover:text-gray-1000 transition-colors">
-            Project
-          </Link>
-        </nav>
-
         {isLoading ? (
           <div className="h-9 w-32 animate-pulse rounded-pill bg-gray-400" />
         ) : isConnected && accountId ? (

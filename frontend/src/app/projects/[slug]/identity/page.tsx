@@ -10,6 +10,8 @@ import { useIdentity } from "@/contexts/IdentityContext";
 import { connectEvmWallet, type WalletId } from "@/lib/evm/connect";
 import { buildCanonicalMessage, generateNonce, nowNs, SUPPORTED_CHAINS } from "@/lib/evm/message";
 import { getAllPolicies } from "@/lib/near/contracts";
+import { submitPersona } from "@/lib/tee/attest";
+import { slugOf } from "@/lib/slug";
 
 const CHAIN_NAMES: Record<number, string> = {
   1: "Ethereum", 8453: "Base", 42161: "Arbitrum",
@@ -31,21 +33,30 @@ export default function IdentityPage() {
   const {
     evmWallets, addEvmWallet, markEvmSigned, removeEvmWallet,
     selfIntro, setSelfIntro,
-    githubConnected, setGithubConnected, setGithubToken,
+    githubConnected, githubToken, setGithubConnected, setGithubToken,
     isIdentityComplete,
   } = useIdentity();
 
   const [connecting, setConnecting] = useState<WalletId | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [policyId, setPolicyId] = useState<number>(0);
+  const [policyStatus, setPolicyStatus] = useState<
+    "Upcoming" | "Subscribing" | "Live" | "Closed" | null
+  >(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     getAllPolicies().then((policies) => {
-      const match = policies.find(
-        (p) => p.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+$/, "") === slug,
-      );
-      if (match) setPolicyId(match.id);
+      const match = policies.find((p) => slugOf(p.name) === slug);
+      if (cancelled || !match) return;
+      setPolicyId(match.id);
+      setPolicyStatus(match.status);
     }).catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, [slug]);
 
   // Check GitHub connection status via HttpOnly cookie
@@ -92,6 +103,47 @@ export default function IdentityPage() {
 
   const hasSignedWallet = evmWallets.some((w) => w.signed);
   const hasIntro = selfIntro.trim().length > 0;
+  const isSubscribing = policyStatus === "Subscribing";
+  const canSubmit =
+    isSubscribing && hasSignedWallet && hasIntro && !!accountId && !submitting;
+
+  async function handleSubmit() {
+    if (!canSubmit || !accountId) return;
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const tsNs = nowNs().toString();
+      const signedEvm = evmWallets
+        .filter((w) => w.signed && w.signature && w.message)
+        .map((w) => ({
+          chain_id: w.chainId,
+          address: w.address,
+          signature: w.signature!,
+          message: w.message!,
+          timestamp: tsNs,
+        }));
+      const nonce = generateNonce();
+      const response = await submitPersona({
+        near_account: accountId,
+        policy_id: policyId,
+        wallets: { near: [], evm: signedEvm },
+        self_intro: selfIntro,
+        github_oauth_token: githubToken,
+        nonce,
+        client_timestamp: tsNs,
+      });
+      // Persist attestation for the Subscribe flow on the project page.
+      sessionStorage.setItem(
+        `attestation_${policyId}`,
+        JSON.stringify(response),
+      );
+      router.push(`/projects/${slug}`);
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : "Failed to submit");
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   if (!isConnected) {
     return (
@@ -253,12 +305,21 @@ export default function IdentityPage() {
               </div>
             </section>
 
-            {/* Save */}
+            {/* Submit */}
+            {!isSubscribing && policyStatus && (
+              <p className="text-center text-xs text-alpha-60">
+                Submissions open during the Subscribing phase. Current phase: {policyStatus}.
+              </p>
+            )}
+            {submitError && (
+              <p className="rounded-xl bg-status-refund/10 px-lg py-md text-sm text-status-refund">{submitError}</p>
+            )}
             <button
-              onClick={() => router.push(`/projects/${slug}`)}
-              className="w-full rounded-xl bg-neon-glow py-md text-sm font-medium text-gray-0 transition-colors hover:bg-neon-soft"
+              onClick={handleSubmit}
+              disabled={!canSubmit}
+              className="w-full rounded-xl bg-neon-glow py-md text-sm font-medium text-gray-0 transition-colors hover:bg-neon-soft disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-neon-glow"
             >
-              Save
+              {submitting ? "Submitting..." : "Submit for Review"}
             </button>
           </div>
         </div>
