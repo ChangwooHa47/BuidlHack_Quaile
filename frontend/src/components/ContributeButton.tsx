@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useWallet } from "@/contexts/WalletContext";
 import { generateEligibilityProof } from "@/lib/zk/prove";
 import { contribute } from "@/lib/near/transactions";
-import type { AttestationResponse } from "@/lib/tee/attest";
+import { clearAttestation, loadAttestation } from "@/lib/attestation-store";
 
 interface ContributeButtonProps {
   policyId: number;
@@ -12,8 +12,18 @@ interface ContributeButtonProps {
 
 type Step = "idle" | "proving" | "contributing" | "done" | "error";
 
+// Error messages that indicate the attestation the contract got was too old
+// or otherwise rejected by the verifier — we treat these as "need to re-run
+// identity", per INVESTOR_FLOW §6.
+const VERIFIER_REJECT_PATTERNS = [
+  "AttestationExpired",
+  "InvalidSignature",
+  "AttestationInvalid",
+  "WrongSubject",
+];
+
 export default function ContributeButton({ policyId }: ContributeButtonProps) {
-  const { selector, isConnected } = useWallet();
+  const { selector, isConnected, accountId } = useWallet();
   const [step, setStep] = useState<Step>("idle");
   const [amount, setAmount] = useState("10");
   const [error, setError] = useState<string | null>(null);
@@ -22,14 +32,12 @@ export default function ContributeButton({ policyId }: ContributeButtonProps) {
   async function handleContribute() {
     if (!selector || !isConnected) return;
 
-    // Load attestation from sessionStorage
-    const stored = sessionStorage.getItem(`attestation_${policyId}`);
-    if (!stored) {
+    const attestation = loadAttestation(policyId, accountId);
+    if (!attestation) {
       setError("No attestation found. Please subscribe first.");
       return;
     }
 
-    const attestation: AttestationResponse = JSON.parse(stored);
     setError(null);
 
     try {
@@ -54,10 +62,18 @@ export default function ContributeButton({ policyId }: ContributeButtonProps) {
       setTxHash(result?.transaction?.hash ?? null);
       setStep("done");
 
-      // Clear attestation from session
-      sessionStorage.removeItem(`attestation_${policyId}`);
+      // Contribution is on-chain now; drop the attestation so the next visit
+      // reconstructs state from the contract, not from local storage.
+      clearAttestation(policyId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Contribute failed");
+      const msg = err instanceof Error ? err.message : "Contribute failed";
+      const rejected = VERIFIER_REJECT_PATTERNS.some((p) => msg.includes(p));
+      if (rejected) {
+        // Attestation is no longer valid — wipe it so the sidebar rerenders
+        // back to the "Build Identity" flow after the next contribution fetch.
+        clearAttestation(policyId);
+      }
+      setError(msg);
       setStep("error");
     }
   }

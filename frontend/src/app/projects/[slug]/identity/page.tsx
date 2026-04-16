@@ -12,6 +12,11 @@ import { buildCanonicalMessage, generateNonce, nowNs, SUPPORTED_CHAINS } from "@
 import { getAllPolicies } from "@/lib/near/contracts";
 import { submitPersona } from "@/lib/tee/attest";
 import { slugOf } from "@/lib/slug";
+import {
+  isIneligible,
+  markIneligible,
+  saveAttestation,
+} from "@/lib/attestation-store";
 
 const CHAIN_NAMES: Record<number, string> = {
   1: "Ethereum", 8453: "Base", 42161: "Arbitrum",
@@ -34,7 +39,6 @@ export default function IdentityPage() {
     evmWallets, addEvmWallet, markEvmSigned, removeEvmWallet,
     selfIntro, setSelfIntro,
     githubConnected, githubToken, setGithubConnected, setGithubToken,
-    isIdentityComplete,
   } = useIdentity();
 
   const [connecting, setConnecting] = useState<WalletId | null>(null);
@@ -104,8 +108,16 @@ export default function IdentityPage() {
   const hasSignedWallet = evmWallets.some((w) => w.signed);
   const hasIntro = selfIntro.trim().length > 0;
   const isSubscribing = policyStatus === "Subscribing";
+  const alreadyIneligible = isIneligible(policyId);
   const canSubmit =
-    isSubscribing && hasSignedWallet && hasIntro && !!accountId && !submitting;
+    isSubscribing &&
+    hasSignedWallet &&
+    hasIntro &&
+    !!accountId &&
+    !submitting &&
+    !alreadyIneligible;
+  // Ineligible verdict we just received in this submit. Locks the form.
+  const [localIneligible, setLocalIneligible] = useState(false);
 
   async function handleSubmit() {
     if (!canSubmit || !accountId) return;
@@ -132,18 +144,25 @@ export default function IdentityPage() {
         nonce,
         client_timestamp: tsNs,
       });
-      // Persist attestation for the Subscribe flow on the project page.
-      sessionStorage.setItem(
-        `attestation_${policyId}`,
-        JSON.stringify(response),
-      );
-      router.push(`/projects/${slug}`);
+      const verdict = response.bundle.payload.verdict;
+      if (verdict === "Eligible") {
+        saveAttestation(policyId, response);
+        router.push(`/projects/${slug}`);
+      } else {
+        // INVESTOR_FLOW §10-2: one shot per policy. Never auto-redirect —
+        // the user should see the verdict in place.
+        markIneligible(policyId);
+        setLocalIneligible(true);
+      }
     } catch (err) {
+      // TEE / network failure — no storage side-effects, user can retry.
       setSubmitError(err instanceof Error ? err.message : "Failed to submit");
     } finally {
       setSubmitting(false);
     }
   }
+
+  const showIneligibleNotice = alreadyIneligible || localIneligible;
 
   if (!isConnected) {
     return (
@@ -311,16 +330,26 @@ export default function IdentityPage() {
                 Submissions open during the Subscribing phase. Current phase: {policyStatus}.
               </p>
             )}
-            {submitError && (
+            {showIneligibleNotice && (
+              <div className="rounded-xl border border-status-refund/30 bg-status-refund/5 px-lg py-md text-sm text-status-refund">
+                Review declined — your persona did not meet this policy&apos;s criteria. Re-submission is not available.
+                <Link href={`/projects/${slug}`} className="ml-xs underline hover:text-status-refund/80">
+                  Return to project
+                </Link>
+              </div>
+            )}
+            {submitError && !showIneligibleNotice && (
               <p className="rounded-xl bg-status-refund/10 px-lg py-md text-sm text-status-refund">{submitError}</p>
             )}
-            <button
-              onClick={handleSubmit}
-              disabled={!canSubmit}
-              className="w-full rounded-xl bg-neon-glow py-md text-sm font-medium text-gray-0 transition-colors hover:bg-neon-soft disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-neon-glow"
-            >
-              {submitting ? "Submitting..." : "Submit for Review"}
-            </button>
+            {!showIneligibleNotice && (
+              <button
+                onClick={handleSubmit}
+                disabled={!canSubmit}
+                className="w-full rounded-xl bg-neon-glow py-md text-sm font-medium text-gray-0 transition-colors hover:bg-neon-soft disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-neon-glow"
+              >
+                {submitting ? "Submitting..." : "Submit for Review"}
+              </button>
+            )}
           </div>
         </div>
       </main>

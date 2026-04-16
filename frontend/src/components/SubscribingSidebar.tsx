@@ -3,12 +3,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import StatusBadge from "./StatusBadge";
-import PersonaForm from "./PersonaForm";
 import ContributeButton from "./ContributeButton";
 import { useWallet } from "@/contexts/WalletContext";
 import { useIdentity } from "@/contexts/IdentityContext";
 import { getContribution, type OnChainContribution } from "@/lib/near/contracts";
 import { claim, refund } from "@/lib/near/transactions";
+import { isIneligible, loadAttestation } from "@/lib/attestation-store";
 import type { Phase } from "@/types";
 
 interface SubscribingSidebarProps {
@@ -19,37 +19,64 @@ interface SubscribingSidebarProps {
   slug?: string;
 }
 
-type Flow = "identity" | "persona" | "contribute" | "waiting" | "claim" | "refund" | "done";
+// See planning/INVESTOR_FLOW.md §3 for the full state-machine table.
+type Flow =
+  | "identity"
+  | "rejected"
+  | "contribute"
+  | "waiting"
+  | "claim"
+  | "refund"
+  | "done";
 
 export default function SubscribingSidebar({ name, ticker, status, policyId, slug }: SubscribingSidebarProps) {
   const { selector, isConnected, accountId } = useWallet();
-  const { evmWallets, githubConnected, isIdentityComplete } = useIdentity();
+  const { evmWallets, githubConnected } = useIdentity();
   const [flow, setFlow] = useState<Flow>("identity");
   const [contribution, setContribution] = useState<OnChainContribution | null>(null);
   const [txPending, setTxPending] = useState(false);
 
   useEffect(() => {
     if (!accountId || policyId === undefined) return;
-    getContribution(accountId, policyId).then((c) => {
+    let cancelled = false;
+    (async () => {
+      const c = await getContribution(accountId, policyId);
+      if (cancelled) return;
       setContribution(c);
-      if (!c) {
-        setFlow("identity");
-      } else if (c.outcome === "NotSettled") {
-        setFlow("waiting");
-      } else if (
-        (c.outcome === "FullMatch" && !c.claim_done) ||
-        (c.outcome === "PartialMatch" && !c.claim_done)
-      ) {
-        setFlow("claim");
-      } else if (
-        (c.outcome === "NoMatch" && !c.refund_done) ||
-        (c.outcome === "PartialMatch" && !c.refund_done && c.claim_done)
-      ) {
-        setFlow("refund");
-      } else {
-        setFlow("done");
+      if (c) {
+        // Contribution exists — on-chain is the source of truth for the rest.
+        if (c.outcome === "NotSettled") {
+          setFlow("waiting");
+        } else if (
+          (c.outcome === "FullMatch" && !c.claim_done) ||
+          (c.outcome === "PartialMatch" && !c.claim_done)
+        ) {
+          setFlow("claim");
+        } else if (
+          (c.outcome === "NoMatch" && !c.refund_done) ||
+          (c.outcome === "PartialMatch" && !c.refund_done && c.claim_done)
+        ) {
+          setFlow("refund");
+        } else {
+          setFlow("done");
+        }
+        return;
       }
-    });
+      // No contribution yet — consult localStorage in the order prescribed
+      // by INVESTOR_FLOW §5: ineligible flag first, then attestation.
+      if (isIneligible(policyId)) {
+        setFlow("rejected");
+        return;
+      }
+      if (loadAttestation(policyId, accountId)) {
+        setFlow("contribute");
+        return;
+      }
+      setFlow("identity");
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [accountId, policyId]);
 
   async function handleClaim() {
@@ -128,7 +155,7 @@ export default function SubscribingSidebar({ name, ticker, status, policyId, slu
           {isSubscribing ? (
             <Link
               href={`/projects/${slug || "unknown"}/identity`}
-              className="flex w-full items-center justify-center rounded-lg border border-gray-500 py-2.5 text-sm font-medium text-gray-1000 hover:bg-alpha-8 transition-colors"
+              className="flex w-full items-center justify-center rounded-lg bg-neon-glow py-2.5 text-sm font-medium text-gray-0 hover:bg-neon-soft transition-colors"
             >
               Build Identity
             </Link>
@@ -141,15 +168,6 @@ export default function SubscribingSidebar({ name, ticker, status, policyId, slu
               Build Identity
             </button>
           )}
-          {isSubscribing && policyId !== undefined && (
-            <button
-              disabled={!isIdentityComplete}
-              onClick={() => setFlow("persona")}
-              className="w-full rounded-lg bg-neon-glow py-2.5 text-sm font-medium text-gray-0 transition-colors enabled:hover:bg-neon-soft disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {isIdentityComplete ? "Subscribe" : "Complete Identity First"}
-            </button>
-          )}
           {!isSubscribing && (
             <p className="text-center text-xs text-alpha-60">
               Identity setup opens during the Subscribing phase.
@@ -158,11 +176,13 @@ export default function SubscribingSidebar({ name, ticker, status, policyId, slu
         </div>
       )}
 
-      {flow === "persona" && policyId !== undefined && (
-        <PersonaForm
-          policyId={policyId}
-          onAttestationComplete={() => setFlow("contribute")}
-        />
+      {flow === "rejected" && (
+        <div className="rounded-lg border border-status-refund/30 bg-status-refund/5 px-md py-sm">
+          <p className="text-sm font-medium text-status-refund">Review declined</p>
+          <p className="mt-xs text-xs text-alpha-60">
+            Your persona did not meet this policy&apos;s criteria. Re-submission is not available for this policy.
+          </p>
+        </div>
       )}
 
       {flow === "contribute" && policyId !== undefined && (

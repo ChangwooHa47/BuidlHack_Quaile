@@ -4,6 +4,8 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -85,6 +87,19 @@ export function IdentityProvider({ children }: { children: ReactNode }) {
     setGithubToken(null);
     setSelfIntro("");
   }, []);
+
+  // Wipe persona state when the connected NEAR account changes (sign-out or
+  // wallet switch). INVESTOR_FLOW §10-3. Defer the reset to a microtask so
+  // we don't call setState synchronously inside the effect body (lint rule
+  // react-hooks/set-state-in-effect) and we still land on the next tick.
+  const lastAccountIdRef = useRef<string | null>(accountId);
+  useEffect(() => {
+    if (lastAccountIdRef.current === accountId) return;
+    const hadPrevious = lastAccountIdRef.current !== null;
+    lastAccountIdRef.current = accountId;
+    if (!hadPrevious) return;
+    queueMicrotask(reset);
+  }, [accountId, reset]);
 
   const hasSignedEvmWallet = evmWallets.some((w) => w.signed);
   const isIdentityComplete = !!accountId && hasSignedEvmWallet && selfIntro.trim().length > 0;
