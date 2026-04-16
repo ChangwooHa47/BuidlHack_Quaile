@@ -92,7 +92,6 @@ export default async function ProjectDetailPage({
                 <h2 className="mb-md text-base font-semibold text-gray-1000">Project Details</h2>
                 <div className="divide-y divide-border">
                   {[
-                    { label: "Policy ID", value: String(policy.id) },
                     { label: "Chain", value: policy.chain },
                     { label: "Token Contract", value: policy.sale_config.token_contract },
                     { label: "Payment", value: typeof policy.sale_config.payment_token === "string" ? policy.sale_config.payment_token : "NEP-141" },
