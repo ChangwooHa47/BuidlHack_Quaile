@@ -24,6 +24,14 @@ pub fn emit_policy_registered(
     env::log_str(&log);
 }
 
+pub fn emit_policy_updated(id: PolicyId, foundation: &str, ipfs_cid: &str) {
+    let log = format!(
+        r#"EVENT_JSON:{{"standard":"nep297","version":"1.0.0","event":"PolicyUpdated","data":{{"id":{},"foundation":"{}","ipfs_cid":"{}"}}}}"#,
+        id, foundation, ipfs_cid
+    );
+    env::log_str(&log);
+}
+
 pub fn emit_policy_status_advanced(
     id: PolicyId,
     from: &PolicyStatus,

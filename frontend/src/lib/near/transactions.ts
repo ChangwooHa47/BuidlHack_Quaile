@@ -95,6 +95,44 @@ export async function registerPolicy(
   });
 }
 
+export async function updatePolicy(
+  wallet: Wallet,
+  id: number,
+  name: string,
+  ticker: string,
+  description: string,
+  chain: string,
+  logoUrl: string,
+  naturalLanguage: string,
+  ipfsCid: string,
+  saleConfig: SaleConfigArgs,
+) {
+  return wallet.signAndSendTransaction({
+    receiverId: CONTRACT_IDS.policyRegistry,
+    actions: [
+      {
+        type: "FunctionCall",
+        params: {
+          methodName: "update_policy",
+          args: {
+            id,
+            name,
+            ticker,
+            description,
+            chain,
+            logo_url: logoUrl,
+            natural_language: naturalLanguage,
+            ipfs_cid: ipfsCid,
+            sale_config: saleConfig,
+          },
+          gas: "100000000000000",
+          deposit: "0",
+        },
+      },
+    ],
+  });
+}
+
 export async function forceStatus(
   wallet: Wallet,
   policyId: number,

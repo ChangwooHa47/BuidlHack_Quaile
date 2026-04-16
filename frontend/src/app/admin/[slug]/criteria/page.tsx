@@ -6,9 +6,16 @@ import { useParams, useRouter } from "next/navigation";
 import { useWallet } from "@/contexts/WalletContext";
 import { getAllPolicies, type OnChainPolicy } from "@/lib/near/contracts";
 import { slugOf } from "@/lib/slug";
-import { registerPolicy } from "@/lib/near/transactions";
+import { registerPolicy, updatePolicy } from "@/lib/near/transactions";
 import AddCriteriaModal from "@/components/AddCriteriaModal";
 import StatusBadge from "@/components/StatusBadge";
+
+// Convert a nanosecond timestamp into the value shape a <input type="datetime-local"> expects.
+function nsToDatetimeLocal(ns: number): string {
+  const d = new Date(ns / 1_000_000);
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 interface CriteriaGroup {
   main: string;
@@ -39,17 +46,31 @@ export default function AdminCriteriaPage() {
   const [liveEnd, setLiveEnd] = useState("");
 
   useEffect(() => {
-    getAllPolicies()
-      .then((all) => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const all = await getAllPolicies();
         const p = all.find((x) => slugOf(x.name) === slug) ?? null;
+        if (cancelled) return;
         setPolicy(p);
         if (p?.natural_language) {
           const lines = p.natural_language.split("\n").filter((l) => l.trim());
           setCriteria([{ main: lines[0] || "", sub: lines.slice(1), externalVisible: true }]);
         }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+        if (p) {
+          setTokenContract(p.sale_config.token_contract);
+          setTotalAllocation(p.sale_config.total_allocation);
+          setPricePerToken(p.sale_config.price_per_token);
+          setSubscriptionStart(nsToDatetimeLocal(p.sale_config.subscription_start));
+          setSubscriptionEnd(nsToDatetimeLocal(p.sale_config.subscription_end));
+          setLiveEnd(nsToDatetimeLocal(p.sale_config.live_end));
+        }
+      } catch { /* ignore */ }
+      if (!cancelled) setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [slug]);
 
   function handleAddCriteria(main: string, sub: string[]) {
@@ -87,26 +108,44 @@ export default function AdminCriteriaPage() {
       const endNs = new Date(subscriptionEnd).getTime() * 1_000_000;
       const liveNs = new Date(liveEnd).getTime() * 1_000_000;
 
-      await registerPolicy(
-        wallet,
-        policy?.name || "New Project",
-        policy?.ticker || "TKN",
-        policy?.description || "A new project on Qualie.",
-        policy?.chain || "NEAR",
-        policy?.logo_url || "https://placehold.co/128",
-        naturalLanguage,
-        "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3ocirgf5de2yjvei",
-        {
-          token_contract: tokenContract,
-          total_allocation: totalAllocation,
-          price_per_token: pricePerToken,
-          payment_token: "Near",
-          subscription_start: startNs,
-          subscription_end: endNs,
-          live_end: liveNs,
-        },
-      );
-      alert("Policy published!");
+      const saleConfig = {
+        token_contract: tokenContract,
+        total_allocation: totalAllocation,
+        price_per_token: pricePerToken,
+        payment_token: "Near" as const,
+        subscription_start: startNs,
+        subscription_end: endNs,
+        live_end: liveNs,
+      };
+
+      if (policy) {
+        await updatePolicy(
+          wallet,
+          policy.id,
+          policy.name,
+          policy.ticker,
+          policy.description,
+          policy.chain,
+          policy.logo_url,
+          naturalLanguage,
+          policy.ipfs_cid,
+          saleConfig,
+        );
+        alert("Policy updated!");
+      } else {
+        await registerPolicy(
+          wallet,
+          "New Project",
+          "TKN",
+          "A new project on Qualie.",
+          "NEAR",
+          "https://placehold.co/128",
+          naturalLanguage,
+          "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3ocirgf5de2yjvei",
+          saleConfig,
+        );
+        alert("Policy published!");
+      }
       router.push("/admin");
     } catch (err) {
       alert(`Failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -247,7 +286,9 @@ export default function AdminCriteriaPage() {
               disabled={isPublishing || criteria.length === 0}
               className="rounded-xl bg-neon-glow px-[28px] py-[16px] text-base font-medium text-gray-0 transition-colors hover:bg-neon-soft disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {isPublishing ? "Publishing..." : "Publish Policy"}
+              {isPublishing
+                ? policy ? "Saving..." : "Publishing..."
+                : policy ? "Save Changes" : "Publish Policy"}
             </button>
           </div>
         )}

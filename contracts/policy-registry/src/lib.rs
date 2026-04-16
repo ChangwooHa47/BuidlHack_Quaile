@@ -4,7 +4,7 @@ mod events;
 use errors::PolicyError;
 use events::{
     emit_foundation_added, emit_foundation_removed, emit_policy_registered,
-    emit_policy_status_advanced,
+    emit_policy_status_advanced, emit_policy_updated,
 };
 
 use near_sdk::borsh::{BorshDeserialize, BorshSerialize};
@@ -36,6 +36,52 @@ enum StorageKey {
     ByFoundationInner { foundation_hash: Vec<u8> },
     ByStatus,
     ByStatusInner { status: u8 },
+}
+
+fn validate_policy_inputs(
+    natural_language: &str,
+    ipfs_cid: &str,
+    sale_config: &SaleConfig,
+    now: Timestamp,
+) {
+    let nl_chars = natural_language.chars().count();
+    if nl_chars < 20 {
+        PolicyError::NaturalLanguageTooShort.panic();
+    }
+    if nl_chars > 2000 {
+        PolicyError::NaturalLanguageTooLong.panic();
+    }
+
+    if !is_valid_ipfs_cid(ipfs_cid) {
+        PolicyError::InvalidIpfsCid.panic();
+    }
+
+    if sale_config.subscription_start <= now {
+        PolicyError::InvalidSaleConfig("subscription_start must be in the future").panic();
+    }
+
+    if sale_config.subscription_end <= sale_config.subscription_start + ONE_HOUR_NS {
+        PolicyError::InvalidSaleConfig(
+            "subscription_end must be > subscription_start + 1 hour",
+        )
+        .panic();
+    }
+
+    if sale_config.live_end <= sale_config.subscription_end {
+        PolicyError::InvalidSaleConfig("live_end must be > subscription_end").panic();
+    }
+
+    if sale_config.total_allocation.0 == 0 {
+        PolicyError::InvalidSaleConfig("total_allocation must be > 0").panic();
+    }
+
+    if sale_config.price_per_token.0 == 0 {
+        PolicyError::InvalidSaleConfig("price_per_token must be > 0").panic();
+    }
+
+    if sale_config.token_contract.as_str().is_empty() {
+        PolicyError::InvalidSaleConfig("token_contract must not be empty").panic();
+    }
 }
 
 fn status_to_u8(s: &PolicyStatus) -> u8 {
@@ -124,54 +170,10 @@ impl PolicyRegistry {
             PolicyError::NotAFoundation.panic();
         }
 
-        // 2. natural_language length [20, 2000] chars
-        let nl_chars = natural_language.chars().count();
-        if nl_chars < 20 {
-            PolicyError::NaturalLanguageTooShort.panic();
-        }
-        if nl_chars > 2000 {
-            PolicyError::NaturalLanguageTooLong.panic();
-        }
-
-        // 3. Valid IPFS CID
-        if !is_valid_ipfs_cid(&ipfs_cid) {
-            PolicyError::InvalidIpfsCid.panic();
-        }
-
         let now: Timestamp = env::block_timestamp();
 
-        // 4. subscription_start > block_timestamp
-        if sale_config.subscription_start <= now {
-            PolicyError::InvalidSaleConfig("subscription_start must be in the future").panic();
-        }
-
-        // 5. subscription_end > subscription_start + 1 hour
-        if sale_config.subscription_end <= sale_config.subscription_start + ONE_HOUR_NS {
-            PolicyError::InvalidSaleConfig(
-                "subscription_end must be > subscription_start + 1 hour",
-            )
-            .panic();
-        }
-
-        // 6. live_end > subscription_end
-        if sale_config.live_end <= sale_config.subscription_end {
-            PolicyError::InvalidSaleConfig("live_end must be > subscription_end").panic();
-        }
-
-        // 7. total_allocation > 0
-        if sale_config.total_allocation.0 == 0 {
-            PolicyError::InvalidSaleConfig("total_allocation must be > 0").panic();
-        }
-
-        // 8. price_per_token > 0
-        if sale_config.price_per_token.0 == 0 {
-            PolicyError::InvalidSaleConfig("price_per_token must be > 0").panic();
-        }
-
-        // 9. token_contract non-empty
-        if sale_config.token_contract.as_str().is_empty() {
-            PolicyError::InvalidSaleConfig("token_contract must not be empty").panic();
-        }
+        // 2. Shared field-level validation
+        validate_policy_inputs(&natural_language, &ipfs_cid, &sale_config, now);
 
         let id = self.next_policy_id;
         self.next_policy_id += 1;
@@ -351,6 +353,68 @@ impl PolicyRegistry {
     pub fn set_escrow_account(&mut self, escrow: AccountId) {
         self.assert_owner();
         self.escrow_account = Some(escrow);
+    }
+
+    /// Foundation-owner only: edit a policy while it is still Upcoming.
+    ///
+    /// Mutates the editable subset of [`Policy`] in place. `id`, `foundation`,
+    /// `status`, and `created_at` are immutable and are preserved from the
+    /// existing record. All other fields are replaced with the caller-supplied
+    /// values and re-validated via [`validate_policy_inputs`].
+    #[allow(clippy::too_many_arguments)]
+    pub fn update_policy(
+        &mut self,
+        id: PolicyId,
+        name: String,
+        ticker: String,
+        description: String,
+        chain: String,
+        logo_url: String,
+        natural_language: String,
+        ipfs_cid: String,
+        sale_config: SaleConfig,
+    ) {
+        let predecessor = env::predecessor_account_id();
+
+        // 1. Caller must still be a registered foundation
+        if !self.foundations.contains(&predecessor) {
+            PolicyError::NotAFoundation.panic();
+        }
+
+        // 2. Policy must exist
+        let mut policy = match self.policies.get(&id) {
+            Some(p) => p,
+            None => PolicyError::PolicyNotFound(id).panic(),
+        };
+
+        // 3. Caller must own this specific policy
+        if policy.foundation != predecessor {
+            PolicyError::Unauthorized.panic();
+        }
+
+        // 4. Only editable while Upcoming
+        if policy.status != PolicyStatus::Upcoming {
+            PolicyError::WrongStatusForEdit.panic();
+        }
+
+        let now: Timestamp = env::block_timestamp();
+
+        // 5. Shared field-level validation
+        validate_policy_inputs(&natural_language, &ipfs_cid, &sale_config, now);
+
+        // Mutate editable fields; id / foundation / status / created_at preserved.
+        policy.name = name;
+        policy.ticker = ticker;
+        policy.description = description;
+        policy.chain = chain;
+        policy.logo_url = logo_url;
+        policy.natural_language = natural_language;
+        policy.ipfs_cid = ipfs_cid.clone();
+        policy.sale_config = sale_config;
+
+        self.policies.insert(&id, &policy);
+
+        emit_policy_updated(id, predecessor.as_str(), &ipfs_cid);
     }
 
     // ── View methods ──────────────────────────────────────────────────────────

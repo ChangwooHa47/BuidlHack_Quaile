@@ -310,3 +310,152 @@ fn test_edge_removed_foundation_cannot_register() {
         valid_nl(), VALID_CID.to_string(), valid_sale_config(now, 3_600_000_000_000),
     );
 }
+
+// ── update_policy tests ──────────────────────────────────────────────────────
+
+fn other_foundation() -> AccountId {
+    "other-foundation.testnet".parse().unwrap()
+}
+
+/// Register a policy owned by `foundation()` and return (contract, id, now).
+fn setup_registered_policy() -> (PolicyRegistry, u64, u64) {
+    let now: u64 = 1_000_000_000_000;
+    testing_env!(context(owner()).block_timestamp(now).build());
+    let mut contract = PolicyRegistry::new(owner());
+    contract.add_foundation(foundation());
+
+    testing_env!(context(foundation()).block_timestamp(now).build());
+    let id = contract.register_policy(
+        meta_name(), meta_ticker(), meta_desc(), meta_chain(), meta_logo(),
+        valid_nl(), VALID_CID.to_string(), valid_sale_config(now, 3_600_000_000_000),
+    );
+    (contract, id, now)
+}
+
+// 12. Happy: update_policy in Upcoming → fields updated, status preserved
+#[test]
+fn test_happy_update_policy_in_upcoming() {
+    let (mut contract, id, now) = setup_registered_policy();
+
+    let new_nl = "Updated natural-language policy description string.".to_string();
+    let mut new_cfg = valid_sale_config(now, 7_200_000_000_000); // 2 h offset
+    new_cfg.total_allocation = U128(2_000_000);
+
+    testing_env!(context(foundation()).block_timestamp(now).build());
+    contract.update_policy(
+        id,
+        "New Name".to_string(),
+        "NEW".to_string(),
+        "New desc".to_string(),
+        "ETH".to_string(),
+        "https://placehold.co/256".to_string(),
+        new_nl.clone(),
+        VALID_CID.to_string(),
+        new_cfg.clone(),
+    );
+
+    let updated = contract.get_policy(id).expect("policy should exist");
+    assert_eq!(updated.name, "New Name");
+    assert_eq!(updated.ticker, "NEW");
+    assert_eq!(updated.chain, "ETH");
+    assert_eq!(updated.natural_language, new_nl);
+    assert_eq!(updated.sale_config.total_allocation, new_cfg.total_allocation);
+    // Immutable fields preserved.
+    assert_eq!(updated.id, id);
+    assert_eq!(updated.foundation, foundation());
+    assert_eq!(updated.status, PolicyStatus::Upcoming);
+}
+
+// 13. Edge: update_policy while Subscribing → WrongStatusForEdit
+#[test]
+#[should_panic(expected = "WrongStatusForEdit")]
+fn test_edge_update_policy_wrong_status_panics() {
+    let (mut contract, id, now) = setup_registered_policy();
+
+    // Owner force-advances status to Subscribing.
+    testing_env!(context(owner()).block_timestamp(now).build());
+    contract.force_status(id, PolicyStatus::Subscribing);
+
+    // Foundation tries to edit — should panic.
+    testing_env!(context(foundation()).block_timestamp(now).build());
+    contract.update_policy(
+        id,
+        meta_name(), meta_ticker(), meta_desc(), meta_chain(), meta_logo(),
+        valid_nl(), VALID_CID.to_string(),
+        valid_sale_config(now, 3_600_000_000_000),
+    );
+}
+
+// 14. Edge: non-owner foundation tries to edit → Unauthorized
+#[test]
+#[should_panic(expected = "Unauthorized")]
+fn test_edge_update_policy_non_owner_panics() {
+    let (mut contract, id, now) = setup_registered_policy();
+
+    // Whitelist a second foundation.
+    testing_env!(context(owner()).block_timestamp(now).build());
+    contract.add_foundation(other_foundation());
+
+    // The other foundation tries to edit policy owned by `foundation()`.
+    testing_env!(context(other_foundation()).block_timestamp(now).build());
+    contract.update_policy(
+        id,
+        meta_name(), meta_ticker(), meta_desc(), meta_chain(), meta_logo(),
+        valid_nl(), VALID_CID.to_string(),
+        valid_sale_config(now, 3_600_000_000_000),
+    );
+}
+
+// 15. Edge: caller not in foundations whitelist → NotAFoundation
+#[test]
+#[should_panic(expected = "NotAFoundation")]
+fn test_edge_update_policy_not_a_foundation_panics() {
+    let (mut contract, id, now) = setup_registered_policy();
+
+    // Revoke the foundation.
+    testing_env!(context(owner()).block_timestamp(now).build());
+    contract.remove_foundation(foundation());
+
+    testing_env!(context(foundation()).block_timestamp(now).build());
+    contract.update_policy(
+        id,
+        meta_name(), meta_ticker(), meta_desc(), meta_chain(), meta_logo(),
+        valid_nl(), VALID_CID.to_string(),
+        valid_sale_config(now, 3_600_000_000_000),
+    );
+}
+
+// 16. Edge: invalid sale config (subscription_start in past) → InvalidSaleConfig
+#[test]
+#[should_panic(expected = "InvalidSaleConfig")]
+fn test_edge_update_policy_invalid_sale_config_panics() {
+    let (mut contract, id, now) = setup_registered_policy();
+
+    let mut bad_cfg = valid_sale_config(now, 3_600_000_000_000);
+    bad_cfg.subscription_start = now - 1;
+
+    testing_env!(context(foundation()).block_timestamp(now).build());
+    contract.update_policy(
+        id,
+        meta_name(), meta_ticker(), meta_desc(), meta_chain(), meta_logo(),
+        valid_nl(), VALID_CID.to_string(), bad_cfg,
+    );
+}
+
+// 17. Edge: unknown policy id → PolicyNotFound
+#[test]
+#[should_panic(expected = "PolicyNotFound(99)")]
+fn test_edge_update_policy_not_found_panics() {
+    let now: u64 = 1_000_000_000_000;
+    testing_env!(context(owner()).block_timestamp(now).build());
+    let mut contract = PolicyRegistry::new(owner());
+    contract.add_foundation(foundation());
+
+    testing_env!(context(foundation()).block_timestamp(now).build());
+    contract.update_policy(
+        99,
+        meta_name(), meta_ticker(), meta_desc(), meta_chain(), meta_logo(),
+        valid_nl(), VALID_CID.to_string(),
+        valid_sale_config(now, 3_600_000_000_000),
+    );
+}

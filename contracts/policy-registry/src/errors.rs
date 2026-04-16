@@ -10,6 +10,7 @@ pub enum PolicyError {
     NaturalLanguageTooLong,
     EscrowNotSet,
     WrongStatusForClose,
+    WrongStatusForEdit,
 }
 
 impl PolicyError {
@@ -24,6 +25,7 @@ impl PolicyError {
             PolicyError::NaturalLanguageTooLong => "NaturalLanguageTooLong".to_string(),
             PolicyError::EscrowNotSet => "EscrowNotSet".to_string(),
             PolicyError::WrongStatusForClose => "WrongStatusForClose".to_string(),
+            PolicyError::WrongStatusForEdit => "WrongStatusForEdit".to_string(),
         };
         near_sdk::env::panic_str(&msg)
     }
