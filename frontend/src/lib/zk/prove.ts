@@ -2,6 +2,15 @@ import type { ZkCircuitInput } from "@/lib/tee/attest";
 
 export interface ZkProofResult {
   proof: object;
+  /**
+   * Public signals **reordered to match the on-chain verifier's expectation**:
+   * `[payload_hash_limbs[0..3], eligible]`.
+   *
+   * snarkjs's native output for this circuit is `[eligible, limb0..limb3]`
+   * (outputs before public inputs, ordered by wire index). The zk-verifier
+   * contract reads `public_inputs[4]` as the eligible flag, so we shift it
+   * to the tail before returning.
+   */
   publicSignals: string[];
 }
 
@@ -24,11 +33,15 @@ export async function generateEligibilityProof(
     ZKEY_URL,
   );
 
-  // Last public signal is `eligible` (1 = all criteria pass)
-  const eligible = publicSignals[publicSignals.length - 1];
-  if (eligible !== "1") {
+  // snarkjs emits `[eligible, payload_hash_limbs[0..3]]`. Bail early if the
+  // witness says not eligible so we don't round-trip through the contract
+  // only to get rejected there.
+  const [eligibleSignal, ...limbs] = publicSignals;
+  if (eligibleSignal !== "1") {
     throw new Error("ZK proof: not eligible (criteria not all passed)");
   }
 
-  return { proof, publicSignals };
+  // The on-chain verifier expects eligible at index 4 (end of the array),
+  // not index 0. Reorder before returning.
+  return { proof, publicSignals: [...limbs, eligibleSignal] };
 }

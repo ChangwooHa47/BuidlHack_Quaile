@@ -5,6 +5,7 @@ import { useWallet } from "@/contexts/WalletContext";
 import { generateEligibilityProof } from "@/lib/zk/prove";
 import { contribute } from "@/lib/near/transactions";
 import { clearAttestation, loadAttestation } from "@/lib/attestation-store";
+import { toContractBundle } from "@/lib/tee/bundle";
 
 interface ContributeButtonProps {
   policyId: number;
@@ -53,7 +54,7 @@ export default function ContributeButton({ policyId }: ContributeButtonProps) {
       const result = await contribute(
         wallet,
         policyId,
-        attestation.bundle,
+        toContractBundle(attestation.bundle),
         JSON.stringify(proof),
         JSON.stringify(publicSignals),
         amount,
