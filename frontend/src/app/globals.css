@@ -51,7 +51,27 @@
   /* Font */
   --font-sans: var(--font-dm-sans), system-ui, sans-serif;
 
-  /* Spacing */
+  /*
+   * Spacing
+   *
+   * ⚠️ Known collision: Tailwind v4 uses `--spacing-<name>` as the backing
+   * value for every named size utility — not just padding/margin/gap but also
+   *   `max-w-*`, `w-*`, `h-*`, `min-w-*`, `min-h-*`, `size-*`
+   * whenever the key matches one of the names below. That means
+   *   max-w-sm  →  12px   (not Tailwind's default 24rem)
+   *   max-w-md  →  16px   (not 28rem)
+   *   …
+   * This project's design tokens happen to share the Tailwind keys, so sizing
+   * utilities are silently broken. See planning issue #34 for the long-term
+   * rename plan.
+   *
+   * Until then: DO NOT use `max-w-sm | max-w-md | max-w-lg | max-w-xl |
+   * max-w-2xl | max-w-3xl` (and the `w-/h-/min-*` siblings). Use an
+   * arbitrary value with the pixel/rem literal instead:
+   *   max-w-[384px] / w-[24rem] / h-[2rem] …
+   * The eslint-plugin rule defined in eslint.config.mjs catches these at lint
+   * time. Padding / margin / gap remain safe (`p-sm`, `gap-md`, …).
+   */
   --spacing-2xs: 4px;
   --spacing-xs: 8px;
   --spacing-sm: 12px;
