@@ -36,8 +36,8 @@ export default function AdminLayout({
 
   if (!isLoading && !isConnected) {
     return (
-      <div className="flex h-screen items-center justify-center bg-background">
-        <div className="max-w-sm rounded-2xl border border-alpha-12 bg-gray-100 p-xl text-center">
+      <div className="flex min-h-screen w-full flex-1 items-center justify-center bg-background px-lg">
+        <div className="w-full max-w-[384px] rounded-2xl border border-alpha-12 bg-gray-100 p-xl text-center">
           <p className="text-xs font-medium uppercase tracking-wider text-alpha-40">Foundation Console</p>
           <h1 className="mt-sm text-xl font-semibold tracking-tight text-gray-1000">Connect your wallet</h1>
           <p className="mt-xs text-sm text-alpha-60">
