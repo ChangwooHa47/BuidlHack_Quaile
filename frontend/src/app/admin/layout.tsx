@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useWallet } from "@/contexts/WalletContext";
 import { getAllPolicies, type OnChainPolicy } from "@/lib/near/contracts";
@@ -69,8 +70,15 @@ export default function AdminLayout({
       <aside className="flex w-[260px] shrink-0 flex-col border-r border-alpha-12 bg-gray-100">
         {/* Logo */}
         <div className="flex h-16 items-center px-lg border-b border-alpha-12">
-          <Link href="/" className="text-xl font-semibold tracking-tight text-gray-1000">
-            Qualie.
+          <Link href="/" className="flex items-center">
+            <Image
+              src="/logo.png"
+              alt="Qualie"
+              width={128}
+              height={28}
+              priority
+              className="h-7 w-auto"
+            />
           </Link>
         </div>
 
