@@ -10,7 +10,6 @@ import {
 } from "react";
 import type { WalletSelector, AccountState } from "@near-wallet-selector/core";
 import { getWalletSelector } from "@/lib/near/wallet-selector";
-import { CONTRACT_IDS } from "@/lib/near/config";
 
 interface WalletContextValue {
   selector: WalletSelector | null;
@@ -62,8 +61,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback(async () => {
     if (!selector) return;
     const wallet = await selector.wallet("my-near-wallet");
+    // Request FullAccess so the same session can call both policy-registry
+    // (e.g. update_policy) and ido-escrow (contribute/claim/refund). A
+    // single LAK can only target one contract, and foundation admin flows
+    // need to hit both.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (wallet as any).signIn({ contractId: CONTRACT_IDS.idoEscrow });
+    await (wallet as any).signIn({});
   }, [selector]);
 
   const signOut = useCallback(async () => {
