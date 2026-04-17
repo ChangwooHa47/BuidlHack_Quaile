@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from canonical import payload_hash as compute_payload_hash
+from criteria_parser import parse_criteria_from_natural_language
 from crypto import TeeSigner
 from ownership import FreshnessError, verify_all_wallets
 from schemas import (
@@ -227,10 +228,15 @@ async def process_persona(
         if not remote_report:
             raise RemoteAttestationFailed("empty NEAR AI attestation report")
 
-        try:
-            rules = await deps.llm_client.structurize(policy.natural_language)
-        except Exception as exc:
-            raise LlmStructurizeFailed(str(exc)) from exc
+        # Prefer the admin-curated sub-criteria stored in natural_language.
+        # Fall back to LLM structurize only for legacy policies that have
+        # no sub-bullets (= free-form text predating the structured format).
+        rules = parse_criteria_from_natural_language(policy.natural_language)
+        if rules is None:
+            try:
+                rules = await deps.llm_client.structurize(policy.natural_language)
+            except Exception as exc:
+                raise LlmStructurizeFailed(str(exc)) from exc
 
         try:
             judge_out = await deps.llm_client.judge(
