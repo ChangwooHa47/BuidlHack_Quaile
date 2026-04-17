@@ -57,6 +57,39 @@ export default function AdminCriteriaPage() {
     );
   }
 
+  function updateMain(groupIndex: number, newMain: string) {
+    setCriteria((prev) =>
+      prev.map((c, i) => (i === groupIndex ? { ...c, main: newMain } : c)),
+    );
+  }
+
+  function updateSub(groupIndex: number, subIndex: number, newText: string) {
+    setCriteria((prev) =>
+      prev.map((c, i) =>
+        i === groupIndex
+          ? { ...c, sub: c.sub.map((s, j) => (j === subIndex ? newText : s)) }
+          : c,
+      ),
+    );
+  }
+
+  function removeSub(groupIndex: number, subIndex: number) {
+    setCriteria((prev) =>
+      prev.map((c, i) =>
+        i === groupIndex ? { ...c, sub: c.sub.filter((_, j) => j !== subIndex) } : c,
+      ),
+    );
+  }
+
+  function addSub(groupIndex: number, text: string) {
+    if (!text.trim()) return;
+    setCriteria((prev) =>
+      prev.map((c, i) =>
+        i === groupIndex ? { ...c, sub: [...c.sub, text.trim()] } : c,
+      ),
+    );
+  }
+
   async function handleSave() {
     if (!selector || !policy || criteria.length === 0) return;
 
@@ -169,17 +202,52 @@ export default function AdminCriteriaPage() {
                         {group.externalVisible ? "Public" : "Private"}
                       </span>
                     </div>
-                    <p className="mt-sm text-sm font-medium text-gray-1000 leading-relaxed">{group.main}</p>
-                    {group.sub.length > 0 && (
-                      <ul className="mt-md space-y-xs border-t border-alpha-12 pt-md">
-                        {group.sub.map((s, j) => (
-                          <li key={j} className="flex items-start gap-xs text-sm text-alpha-80 leading-relaxed">
-                            <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-neon-glow" />
-                            {s}
-                          </li>
-                        ))}
-                      </ul>
+                    {!isLocked ? (
+                      <input
+                        type="text"
+                        value={group.main}
+                        onChange={(e) => updateMain(i, e.target.value)}
+                        className="mt-sm w-full bg-transparent text-sm font-medium text-gray-1000 leading-relaxed border-b border-transparent focus:border-alpha-20 outline-none transition-colors"
+                      />
+                    ) : (
+                      <p className="mt-sm text-sm font-medium text-gray-1000 leading-relaxed">{group.main}</p>
                     )}
+                    <div className="mt-md space-y-xs border-t border-alpha-12 pt-md">
+                      {group.sub.map((s, j) => (
+                        <div key={j} className="flex items-start gap-xs">
+                          <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-neon-glow" />
+                          {!isLocked ? (
+                            <input
+                              type="text"
+                              value={s}
+                              onChange={(e) => updateSub(i, j, e.target.value)}
+                              className="flex-1 bg-transparent text-sm text-alpha-80 leading-relaxed border-b border-transparent focus:border-alpha-20 outline-none transition-colors"
+                            />
+                          ) : (
+                            <span className="text-sm text-alpha-80 leading-relaxed">{s}</span>
+                          )}
+                          {!isLocked && (
+                            <button
+                              onClick={() => removeSub(i, j)}
+                              className="shrink-0 text-xs text-alpha-40 hover:text-status-refund transition-colors"
+                            >
+                              &times;
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      {!isLocked && (
+                        <button
+                          onClick={() => {
+                            const text = prompt("New sub-criterion:");
+                            if (text) addSub(i, text);
+                          }}
+                          className="mt-xs flex items-center gap-xs text-xs text-alpha-40 hover:text-alpha-60 transition-colors"
+                        >
+                          <span>+</span> Add sub-criterion
+                        </button>
+                      )}
+                    </div>
                   </div>
                   {!isLocked && (
                     <div className="flex items-center justify-end gap-xs border-t border-alpha-12 bg-gray-150 px-lg py-sm">
