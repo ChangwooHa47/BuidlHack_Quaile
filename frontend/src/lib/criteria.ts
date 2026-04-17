@@ -41,7 +41,13 @@ export interface CriteriaGroup {
 
 const HIDDEN_PREFIX = "[HIDDEN] ";
 const SUB_PREFIX = "  - ";
-const LOOSE_SUB_PREFIX = /^\s*-\s+/; // Fallback for sub lines that don't use the exact canonical prefix.
+const LOOSE_SUB_PREFIX = /^\s*-\s+/;
+const THRESHOLD_RE = /^\[THRESHOLD:(\d+)\]$/i;
+
+export interface ParsedCriteriaResult {
+  groups: CriteriaGroup[];
+  threshold: number | null;
+}
 
 function normalizeNewlines(input: string): string {
   // Accept CRLF / CR as newline separators.
@@ -69,26 +75,32 @@ function isIndented(line: string): boolean {
  * fallback sub or their own main-only group) so operator-typed legacy text
  * round-trips without silently vanishing.
  */
-export function parseCriteria(naturalLanguage: string): CriteriaGroup[] {
-  if (!naturalLanguage) return [];
+export function parseCriteriaWithThreshold(naturalLanguage: string): ParsedCriteriaResult {
+  if (!naturalLanguage) return { groups: [], threshold: null };
 
   const lines = normalizeNewlines(naturalLanguage)
     .split("\n")
-    .map((l) => l.replace(/\s+$/, "")) // trim trailing whitespace but not leading
+    .map((l) => l.replace(/\s+$/, ""))
     .filter((l) => l.trim() !== "");
 
-  if (lines.length === 0) return [];
+  if (lines.length === 0) return { groups: [], threshold: null };
 
   const groups: CriteriaGroup[] = [];
   let current: CriteriaGroup | null = null;
+  let threshold: number | null = null;
 
   for (const line of lines) {
+    const tm = line.trim().match(THRESHOLD_RE);
+    if (tm) {
+      threshold = parseInt(tm[1], 10);
+      continue;
+    }
+
     if (isCanonicalSub(line)) {
       const text = line.slice(SUB_PREFIX.length).trim();
       if (current) {
         current.sub.push(text);
       } else {
-        // Orphan sub without a main — surface it as its own main-only group.
         current = { main: text, sub: [], externalVisible: true };
         groups.push(current);
       }
@@ -96,9 +108,6 @@ export function parseCriteria(naturalLanguage: string): CriteriaGroup[] {
     }
 
     if (isIndented(line)) {
-      // Non-canonical indent (e.g. "- foo" with one space, or a wrapped
-      // continuation). Prefer treating it as a sub under the current group;
-      // if there is no group yet, take the trimmed text as a main.
       const looseMatch = line.match(LOOSE_SUB_PREFIX);
       const text = looseMatch ? line.replace(LOOSE_SUB_PREFIX, "") : line.trim();
       if (current) {
@@ -110,23 +119,39 @@ export function parseCriteria(naturalLanguage: string): CriteriaGroup[] {
       continue;
     }
 
-    // Fresh main.
     const { visible, text } = stripHiddenPrefix(line);
     current = { main: text, sub: [], externalVisible: visible };
     groups.push(current);
   }
 
-  return groups;
+  // Clamp threshold to valid range
+  const totalSubs = groups.reduce((n, g) => n + g.sub.length, 0);
+  if (threshold !== null && totalSubs > 0) {
+    threshold = Math.max(1, Math.min(threshold, totalSubs));
+  } else if (totalSubs === 0) {
+    threshold = null;
+  }
+
+  return { groups, threshold };
+}
+
+/**
+ * Convenience wrapper that returns only the groups (backward compat).
+ */
+export function parseCriteria(naturalLanguage: string): CriteriaGroup[] {
+  return parseCriteriaWithThreshold(naturalLanguage).groups;
 }
 
 /**
  * Inverse of `parseCriteria`. `parseCriteria(serializeCriteria(groups))` is
  * the identity for groups whose main/sub fields don't embed newlines.
  */
-export function serializeCriteria(groups: CriteriaGroup[]): string {
+export function serializeCriteria(
+  groups: CriteriaGroup[],
+  threshold?: number | null,
+): string {
   const lines: string[] = [];
   for (const g of groups) {
-    // Defensive trim so stray whitespace doesn't flip parser behaviour on reload.
     const main = g.main.replace(/\r\n?/g, " ").trim();
     if (!main) continue;
     const prefix = g.externalVisible ? "" : HIDDEN_PREFIX;
@@ -136,6 +161,11 @@ export function serializeCriteria(groups: CriteriaGroup[]): string {
       if (!s) continue;
       lines.push(SUB_PREFIX + s);
     }
+  }
+  // Append threshold marker if set and less than total sub count.
+  const totalSubs = groups.reduce((n, g) => n + g.sub.length, 0);
+  if (threshold != null && threshold > 0 && threshold < totalSubs) {
+    lines.push(`[THRESHOLD:${threshold}]`);
   }
   return lines.join("\n");
 }

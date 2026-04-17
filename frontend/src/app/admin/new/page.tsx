@@ -42,6 +42,7 @@ export default function AdminNewPolicyPage() {
 
   // Criteria
   const [criteria, setCriteria] = useState<CriteriaGroup[]>([]);
+  const [threshold, setThreshold] = useState<number | null>(null);
   const [showModal, setShowModal] = useState(false);
 
   // Pre-existing slugs — for duplicate-name guard
@@ -125,7 +126,7 @@ export default function AdminNewPolicyPage() {
     try {
       const wallet = await selector.wallet("my-near-wallet");
 
-      const naturalLanguage = serializeCriteria(criteria);
+      const naturalLanguage = serializeCriteria(criteria, threshold);
 
       await registerPolicy(
         wallet,
@@ -301,6 +302,46 @@ export default function AdminNewPolicyPage() {
             </div>
           )}
         </section>
+
+        {/* Passing threshold */}
+        {(() => {
+          const totalSubs = criteria.reduce((n, g) => n + g.sub.length, 0);
+          if (totalSubs === 0) return null;
+          const effectiveThreshold = threshold ?? totalSubs;
+          return (
+            <section className="mt-xl">
+              <div className="rounded-[14px] border border-alpha-12 bg-gray-200 p-lg">
+                <div className="flex items-center justify-between gap-lg">
+                  <div>
+                    <h3 className="text-base font-medium text-gray-1000">Passing Threshold</h3>
+                    <p className="mt-xs text-xs text-alpha-60">
+                      Minimum sub-criteria an applicant must pass to be deemed eligible.
+                      {threshold === null && (
+                        <span className="ml-xs text-alpha-40">(Default: all {totalSubs} must pass)</span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-sm">
+                    <input
+                      type="number"
+                      min={1}
+                      max={totalSubs}
+                      value={effectiveThreshold}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value, 10);
+                        if (!Number.isFinite(v)) return;
+                        const clamped = Math.max(1, Math.min(v, totalSubs));
+                        setThreshold(clamped === totalSubs ? null : clamped);
+                      }}
+                      className="w-16 rounded-lg border border-alpha-12 bg-gray-150 px-sm py-xs text-center text-sm text-gray-1000 focus:border-neon-glow/40 outline-none transition-colors"
+                    />
+                    <span className="text-sm text-alpha-60">/ {totalSubs}</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+          );
+        })()}
 
         {/* Submit */}
         {error && (
