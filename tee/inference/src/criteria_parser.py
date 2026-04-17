@@ -1,30 +1,35 @@
 """
-Parse `Policy.natural_language` into the same `CriteriaRulesModel` that the
-LLM `structurize` call produces.
+Parse `Policy.natural_language` into structured criteria for the TEE judge.
 
-The admin UI stores criterion groups in natural_language using a lightweight
-line-based convention (see frontend/src/lib/criteria.ts for the JS twin):
+Convention (shared with frontend/src/lib/criteria.ts):
 
     main line            : no leading whitespace, plain text
     sub-bullet           : starts with `SUB_PREFIX` ("  - ")
     private-main marker  : main line starts with `HIDDEN_PREFIX` ("[HIDDEN] ")
+    threshold marker     : a standalone line `[THRESHOLD:N]` where N is the
+                           minimum number of sub-criteria that must pass.
+                           If absent, defaults to total sub count (= all must pass).
 
-When the natural_language already contains sub-bullets (because the admin
-ran Generate Sub-Criteria and/or manually edited), we extract them directly
-as the criteria list. The main lines are joined into a qualitative_prompt
-that the judge uses for holistic reasoning.
-
-When the text is legacy free-form (no sub-bullets at all), we fall back to
-LLM-based structurize so existing policies without structured sub-criteria
-continue to work.
+When sub-bullets exist, we extract them as criteria. Otherwise return None
+so the caller falls back to LLM structurize.
 """
 
 from __future__ import annotations
+
+import re
+from dataclasses import dataclass
 
 from schemas import CriteriaRulesModel
 
 HIDDEN_PREFIX = "[HIDDEN] "
 SUB_PREFIX = "  - "
+THRESHOLD_RE = re.compile(r"^\[THRESHOLD:(\d+)\]$", re.IGNORECASE)
+
+
+@dataclass
+class ParsedCriteria:
+    rules: CriteriaRulesModel
+    threshold: int | None
 
 
 def _is_sub_line(line: str) -> bool:
@@ -37,13 +42,12 @@ def _is_indented(line: str) -> bool:
 
 def parse_criteria_from_natural_language(
     natural_language: str,
-) -> CriteriaRulesModel | None:
+) -> ParsedCriteria | None:
     """
-    Try to extract structured criteria from `natural_language`.
+    Try to extract structured criteria + threshold from `natural_language`.
 
-    Returns a `CriteriaRulesModel` when at least one sub-bullet exists,
-    or `None` when the text is legacy free-form (the caller should fall back
-    to LLM structurize).
+    Returns a `ParsedCriteria` when at least one sub-bullet exists,
+    or `None` for legacy free-form text (caller should fall back to LLM).
     """
     lines = [
         l.rstrip()
@@ -55,31 +59,37 @@ def parse_criteria_from_natural_language(
 
     mains: list[str] = []
     subs: list[str] = []
+    threshold: int | None = None
 
     for line in lines:
+        # Check for threshold marker
+        m = THRESHOLD_RE.match(line.strip())
+        if m:
+            threshold = int(m.group(1))
+            continue
+
         if _is_sub_line(line):
             subs.append(line[len(SUB_PREFIX):].strip())
         elif _is_indented(line):
-            # Non-canonical indent — treat as sub.
             stripped = line.lstrip()
             if stripped.startswith("- "):
                 stripped = stripped[2:]
             subs.append(stripped.strip())
         else:
-            # Main line. Strip [HIDDEN] prefix if present (visibility is
-            # an FE concern; the TEE should evaluate against all criteria
-            # regardless of investor-facing visibility).
             text = line
             if text.startswith(HIDDEN_PREFIX):
                 text = text[len(HIDDEN_PREFIX):]
             mains.append(text.strip())
 
     if not subs:
-        # No sub-bullets → legacy free-form. Let the caller fall back to
-        # LLM structurize.
         return None
 
-    # Build qualitative_prompt from the main statements.
+    capped_subs = subs[:10]
+
+    # Clamp threshold to valid range
+    if threshold is not None:
+        threshold = max(1, min(threshold, len(capped_subs)))
+
     qualitative_prompt = (
         "Evaluation context from the foundation's criteria descriptions: "
         + " ".join(mains)
@@ -87,7 +97,10 @@ def parse_criteria_from_natural_language(
         else ""
     )
 
-    return CriteriaRulesModel(
-        criteria=subs[:10],  # MAX_CRITERIA cap
-        qualitative_prompt=qualitative_prompt,
+    return ParsedCriteria(
+        rules=CriteriaRulesModel(
+            criteria=capped_subs,
+            qualitative_prompt=qualitative_prompt,
+        ),
+        threshold=threshold,
     )

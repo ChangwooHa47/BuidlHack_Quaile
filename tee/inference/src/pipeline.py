@@ -61,6 +61,7 @@ class LlmClient(Protocol):
         rules: CriteriaRulesModel,
         signals: AggregatedSignalModel,
         self_intro: str,
+        threshold: int | None = None,
     ) -> JudgeOutputModel: ...
 
 
@@ -107,16 +108,29 @@ def _check_client_freshness(client_timestamp: int, now_ns: int | None = None) ->
         )
 
 
-def validate_judge_output(out: JudgeOutputModel, self_intro: str) -> None:
+def validate_judge_output(
+    out: JudgeOutputModel,
+    self_intro: str,
+    expected_count: int,
+    threshold: int | None = None,
+) -> None:
     if not out.criteria:
         raise LlmJudgeFailed("criteria list must not be empty")
-    if len(out.criteria) > MAX_CRITERIA:
-        raise LlmJudgeFailed(f"too many criteria: {len(out.criteria)} > {MAX_CRITERIA}")
-    all_pass = all(c.passed for c in out.criteria)
-    if out.verdict == "Eligible" and not all_pass:
-        raise LlmJudgeFailed("verdict is Eligible but not all criteria passed")
-    if out.verdict == "Ineligible" and all_pass:
-        raise LlmJudgeFailed("verdict is Ineligible but all criteria passed")
+    if len(out.criteria) != expected_count:
+        raise LlmJudgeFailed(
+            f"criteria count mismatch: expected {expected_count}, got {len(out.criteria)}"
+        )
+    pass_count = sum(1 for c in out.criteria if c.passed)
+    min_pass = threshold if threshold is not None else expected_count
+    should_be_eligible = pass_count >= min_pass
+    if out.verdict == "Eligible" and not should_be_eligible:
+        raise LlmJudgeFailed(
+            f"verdict is Eligible but only {pass_count}/{expected_count} passed (threshold {min_pass})"
+        )
+    if out.verdict == "Ineligible" and should_be_eligible:
+        raise LlmJudgeFailed(
+            f"verdict is Ineligible but {pass_count}/{expected_count} passed (threshold {min_pass})"
+        )
     if len(out.rationale) > RATIONALE_MAX_CHARS:
         raise PiiLeakError("rationale exceeds 280 chars")
     if RE_ETH_ADDR.search(out.rationale):
@@ -231,21 +245,27 @@ async def process_persona(
         # Prefer the admin-curated sub-criteria stored in natural_language.
         # Fall back to LLM structurize only for legacy policies that have
         # no sub-bullets (= free-form text predating the structured format).
-        rules = parse_criteria_from_natural_language(policy.natural_language)
-        if rules is None:
+        parsed = parse_criteria_from_natural_language(policy.natural_language)
+        threshold: int | None = None
+        if parsed is not None:
+            rules = parsed.rules
+            threshold = parsed.threshold
+        else:
             try:
                 rules = await deps.llm_client.structurize(policy.natural_language)
             except Exception as exc:
                 raise LlmStructurizeFailed(str(exc)) from exc
 
+        expected_count = len(rules.criteria)
+
         try:
             judge_out = await deps.llm_client.judge(
-                rules, aggregated, persona.self_intro
+                rules, aggregated, persona.self_intro, threshold=threshold
             )
         except Exception as exc:
             raise LlmJudgeFailed(str(exc)) from exc
 
-        validate_judge_output(judge_out, persona.self_intro)
+        validate_judge_output(judge_out, persona.self_intro, expected_count, threshold)
         criteria_results = build_criteria_results(judge_out)
 
         payload = AttestationPayloadModel(

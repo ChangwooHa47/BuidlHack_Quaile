@@ -30,13 +30,20 @@ Rules:
 
 JUDGE_PROMPT = """You are an IDO investor evaluator running inside a TEE.
 You are given:
-- A list of evaluation criteria to judge
+- A list of evaluation criteria to judge (exactly N items)
 - Aggregated on-chain signals (anonymized)
 - Optional GitHub activity summary
 - Optional self-introduction text
 
 For each criterion, determine whether the investor passes (true) or fails (false).
-The final verdict is Eligible ONLY if ALL criteria pass; otherwise Ineligible.
+
+CRITICAL RULES:
+1. You MUST return EXACTLY the same number of criteria results as the input list.
+   Do NOT add, remove, skip, merge, or reorder criteria.
+2. Each result must correspond to the input criterion at the same index.
+3. The final verdict is Eligible ONLY if the number of passed criteria meets
+   or exceeds the threshold specified in the input. If no threshold is given,
+   ALL criteria must pass.
 
 Output STRICT JSON:
 {
@@ -48,8 +55,6 @@ Output STRICT JSON:
   "rationale": string (≤ 280 chars, NO PII, NO wallet addresses,
     NO GitHub username, NO real-name references)
 }
-
-CRITICAL: verdict MUST be "Eligible" if and only if every criterion has passed=true.
 """
 
 
@@ -111,11 +116,20 @@ class NearAIClient:
         rules: CriteriaRulesModel,
         signals: AggregatedSignalModel,
         self_intro: str,
+        threshold: int | None = None,
     ) -> JudgeOutputModel:
+        n = len(rules.criteria)
+        threshold_instruction = (
+            f"Threshold: the investor is Eligible if at least {threshold} out of {n} criteria pass."
+            if threshold is not None and threshold < n
+            else f"Threshold: ALL {n} criteria must pass for the investor to be Eligible."
+        )
         content = await self.chat(
             system=JUDGE_PROMPT,
             user=json.dumps(
                 {
+                    "criteria_count": n,
+                    "threshold_instruction": threshold_instruction,
                     "criteria": rules.criteria,
                     "qualitative_prompt": rules.qualitative_prompt,
                     "signals": signals.anon_summary(),

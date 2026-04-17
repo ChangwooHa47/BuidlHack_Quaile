@@ -156,7 +156,7 @@ class StubLlmClient:
             qualitative_prompt="Prefer consistent long-term builders.",
         )
 
-    async def judge(self, rules, signals, self_intro: str) -> JudgeOutputModel:
+    async def judge(self, rules, signals, self_intro: str, threshold: int | None = None) -> JudgeOutputModel:
         self.calls.append("judge")
         return JudgeOutputModel(
             verdict="Eligible",

@@ -12,13 +12,14 @@ def test_structured_with_subs():
         "Investors who stayed through the bear market.\n"
         "  - Was the wallet active during the 2022 drawdown?\n"
     )
-    rules = parse_criteria_from_natural_language(nl)
-    assert rules is not None
-    assert len(rules.criteria) == 3
-    assert rules.criteria[0] == "Has the wallet done at least 100 cross-chain swaps?"
-    assert rules.criteria[2] == "Was the wallet active during the 2022 drawdown?"
-    assert "Active DeFi" in rules.qualitative_prompt
-    assert "Investors who stayed" in rules.qualitative_prompt
+    parsed = parse_criteria_from_natural_language(nl)
+    assert parsed is not None
+    assert len(parsed.rules.criteria) == 3
+    assert parsed.rules.criteria[0] == "Has the wallet done at least 100 cross-chain swaps?"
+    assert parsed.rules.criteria[2] == "Was the wallet active during the 2022 drawdown?"
+    assert "Active DeFi" in parsed.rules.qualitative_prompt
+    assert "Investors who stayed" in parsed.rules.qualitative_prompt
+    assert parsed.threshold is None
 
 
 def test_hidden_prefix_stripped():
@@ -28,18 +29,17 @@ def test_hidden_prefix_stripped():
         "Public criterion.\n"
         "  - Is the wallet active?\n"
     )
-    rules = parse_criteria_from_natural_language(nl)
-    assert rules is not None
-    assert len(rules.criteria) == 2
-    # [HIDDEN] should be stripped from the qualitative prompt
-    assert "[HIDDEN]" not in rules.qualitative_prompt
-    assert "Secret internal criterion" in rules.qualitative_prompt
+    parsed = parse_criteria_from_natural_language(nl)
+    assert parsed is not None
+    assert len(parsed.rules.criteria) == 2
+    assert "[HIDDEN]" not in parsed.rules.qualitative_prompt
+    assert "Secret internal criterion" in parsed.rules.qualitative_prompt
 
 
 def test_legacy_flat_returns_none():
     nl = "Active DeFi traders with at least 100 cross-chain swaps in the past 6 months."
-    rules = parse_criteria_from_natural_language(nl)
-    assert rules is None, "legacy flat text should return None for LLM fallback"
+    parsed = parse_criteria_from_natural_language(nl)
+    assert parsed is None, "legacy flat text should return None for LLM fallback"
 
 
 def test_empty_returns_none():
@@ -52,9 +52,9 @@ def test_max_criteria_capped():
     for i in range(15):
         lines.append(f"  - Sub criterion {i}\n")
     nl = "".join(lines)
-    rules = parse_criteria_from_natural_language(nl)
-    assert rules is not None
-    assert len(rules.criteria) == 10  # MAX_CRITERIA cap
+    parsed = parse_criteria_from_natural_language(nl)
+    assert parsed is not None
+    assert len(parsed.rules.criteria) == 10
 
 
 def test_loose_indent_treated_as_sub():
@@ -63,24 +63,70 @@ def test_loose_indent_treated_as_sub():
         " - loosely indented sub\n"
         "   - extra indent sub\n"
     )
-    rules = parse_criteria_from_natural_language(nl)
-    assert rules is not None
-    assert len(rules.criteria) == 2
-    assert rules.criteria[0] == "loosely indented sub"
-    assert rules.criteria[1] == "extra indent sub"
+    parsed = parse_criteria_from_natural_language(nl)
+    assert parsed is not None
+    assert len(parsed.rules.criteria) == 2
+    assert parsed.rules.criteria[0] == "loosely indented sub"
+    assert parsed.rules.criteria[1] == "extra indent sub"
 
 
 def test_crlf_normalized():
     nl = "Main.\r\n  - Sub one.\r\n  - Sub two.\r\n"
-    rules = parse_criteria_from_natural_language(nl)
-    assert rules is not None
-    assert len(rules.criteria) == 2
+    parsed = parse_criteria_from_natural_language(nl)
+    assert parsed is not None
+    assert len(parsed.rules.criteria) == 2
 
 
 def test_orphan_sub_becomes_main():
     nl = "  - Orphan sub without a main above it.\n"
-    rules = parse_criteria_from_natural_language(nl)
-    # Even though it looks like a sub, with no main it should still be
-    # picked up as a criterion so the policy doesn't silently have zero criteria.
-    assert rules is not None
-    assert len(rules.criteria) == 1
+    parsed = parse_criteria_from_natural_language(nl)
+    assert parsed is not None
+    assert len(parsed.rules.criteria) == 1
+
+
+def test_threshold_parsed():
+    nl = (
+        "Main criterion.\n"
+        "  - Sub 1\n"
+        "  - Sub 2\n"
+        "  - Sub 3\n"
+        "[THRESHOLD:2]\n"
+    )
+    parsed = parse_criteria_from_natural_language(nl)
+    assert parsed is not None
+    assert len(parsed.rules.criteria) == 3
+    assert parsed.threshold == 2
+
+
+def test_threshold_clamped_to_count():
+    nl = (
+        "Main.\n"
+        "  - Sub 1\n"
+        "  - Sub 2\n"
+        "[THRESHOLD:99]\n"
+    )
+    parsed = parse_criteria_from_natural_language(nl)
+    assert parsed is not None
+    assert parsed.threshold == 2  # clamped to sub count
+
+
+def test_threshold_min_one():
+    nl = (
+        "Main.\n"
+        "  - Sub 1\n"
+        "[THRESHOLD:0]\n"
+    )
+    parsed = parse_criteria_from_natural_language(nl)
+    assert parsed is not None
+    assert parsed.threshold == 1
+
+
+def test_no_threshold_means_none():
+    nl = (
+        "Main.\n"
+        "  - Sub 1\n"
+        "  - Sub 2\n"
+    )
+    parsed = parse_criteria_from_natural_language(nl)
+    assert parsed is not None
+    assert parsed.threshold is None
