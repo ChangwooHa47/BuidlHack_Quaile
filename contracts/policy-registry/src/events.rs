@@ -5,7 +5,9 @@ fn status_str(s: &PolicyStatus) -> &'static str {
     match s {
         PolicyStatus::Upcoming => "Upcoming",
         PolicyStatus::Subscribing => "Subscribing",
-        PolicyStatus::Live => "Live",
+        PolicyStatus::Contributing => "Contributing",
+        PolicyStatus::Refunding => "Refunding",
+        PolicyStatus::Distributing => "Distributing",
         PolicyStatus::Closed => "Closed",
     }
 }

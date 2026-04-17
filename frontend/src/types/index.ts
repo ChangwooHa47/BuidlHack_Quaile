@@ -1,29 +1,12 @@
-// Phase: 온체인 4개 (카드 상단 chip + 필터)
-export type Phase = "Upcoming" | "Subscribing" | "Live" | "Closed";
+// Phase: 온체인 6개 — 시간 기반 lifecycle
+export type Phase = "Upcoming" | "Subscribing" | "Contributing" | "Refunding" | "Distributing" | "Closed";
 
-// Status: Phase 내 세부 상태 (카드 CTA + 상세 사이드바)
-export type Status =
-  | "Upcoming"
-  | "Subscription"
-  | "Pending"
-  | "Contribution"
-  | "Settlement"
-  | "Refund"
-  | "Claim"
-  | "Closed";
+// Status: Phase 기준 표시 (추후 세부 Status는 디자인 확정 시 추가)
+export type Status = Phase;
 
-// Status → Phase 매핑
+// Status → Phase 매핑 (현재 1:1)
 export function phaseOf(status: Status): Phase {
-  switch (status) {
-    case "Upcoming": return "Upcoming";
-    case "Subscription":
-    case "Pending":
-    case "Contribution": return "Subscribing";
-    case "Settlement":
-    case "Refund":
-    case "Claim": return "Live";
-    case "Closed": return "Closed";
-  }
+  return status;
 }
 
 export interface SaleInfo {

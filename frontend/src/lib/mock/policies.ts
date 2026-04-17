@@ -62,7 +62,7 @@ export const MOCK_POLICIES: PolicyData[] = [
     foundation: "foundation.testnet",
     natural_language: "Ecosystem builders and developers who have contributed to open-source blockchain projects. GitHub activity is weighted heavily in evaluation.",
     ipfs_cid: "bafybeiqwe789",
-    status: "Live",
+    status: "Distributing",
     created_at: (Date.now() - 20 * 86400000) * 1_000_000,
     sale_config: {
       token_contract: "navi.testnet",

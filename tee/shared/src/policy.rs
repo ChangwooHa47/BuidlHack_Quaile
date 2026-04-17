@@ -12,7 +12,7 @@ pub type PolicyId = u64;
 ///
 /// Invariants (enforced by `policy-registry` contract):
 /// - `sale_config.subscription_start > created_at`
-/// - `subscription_start < subscription_end < live_end`
+/// - `subscription_start < subscription_end < contribution_end < refunding_end < distributing_end`
 /// - `sale_config.total_allocation > 0`, `price_per_token > 0`
 /// - `foundation`, `sale_config.token_contract`, `sale_config.total_allocation` are immutable after creation.
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -20,66 +20,65 @@ pub type PolicyId = u64;
 pub struct Policy {
     pub id: PolicyId,
     pub foundation: AccountId,
-    /// Project display name (e.g. "Walrus").
     pub name: String,
-    /// Token ticker symbol (e.g. "W").
     pub ticker: String,
-    /// Short project description for card/hero display.
     pub description: String,
-    /// Primary chain of the project (e.g. "SUI", "NEAR", "SOL").
     pub chain: String,
-    /// Logo URL for project avatar (placeholder or IPFS gateway URL).
     pub logo_url: String,
-    /// Full natural-language selection criteria (also backed to IPFS).
     pub natural_language: String,
-    /// IPFS CID of the policy document (e.g. "bafybeib...").
     pub ipfs_cid: String,
     pub sale_config: SaleConfig,
     pub status: PolicyStatus,
     pub created_at: Timestamp,
 }
 
-/// On-chain phase of the IDO.
+/// On-chain phase of the IDO lifecycle.
 ///
-/// NOTE: The sub-statuses used in the UI (Subscription / Review / Contribution /
-/// Settlement / Refund / Claim) are **off-chain labels only**. The contract stores
-/// only these four variants.
+/// Each phase corresponds to a time window defined by `SaleConfig` timestamps.
+/// Transitions are permissionless and time-based via `advance_status`.
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "contract", borsh(crate = "near_sdk::borsh"))]
 pub enum PolicyStatus {
     Upcoming,
     Subscribing,
-    Live,
+    Contributing,
+    Refunding,
+    Distributing,
     Closed,
 }
 
-/// Sale parameters — immutable once the policy is created.
+/// Sale parameters — set at registration, editable only during Upcoming.
 ///
-/// `live_start` is not a separate field: `live_start := subscription_end`.
+/// Time boundaries define phase transitions:
+///   now < subscription_start           → Upcoming
+///   subscription_start .. subscription_end   → Subscribing
+///   subscription_end .. contribution_end     → Contributing
+///   contribution_end .. refunding_end        → Refunding  (settle + refund)
+///   refunding_end .. distributing_end        → Distributing (claim / TGE)
+///   now >= distributing_end                  → Closed
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "contract", borsh(crate = "near_sdk::borsh"))]
 pub struct SaleConfig {
     pub token_contract: AccountId,
-    /// Total IDO token allocation in token-smallest-units.
     pub total_allocation: U128,
-    /// Price per token in `payment_token` smallest units.
     pub price_per_token: U128,
     pub payment_token: PaymentToken,
-    /// Block timestamp at which Upcoming → Subscribing transition becomes valid.
+    /// Upcoming → Subscribing
     pub subscription_start: Timestamp,
-    /// Block timestamp at which Subscribing → Live transition becomes valid.
-    /// Also acts as `live_start`.
+    /// Subscribing → Contributing
     pub subscription_end: Timestamp,
-    /// Block timestamp at which Live → Closed transition becomes valid.
-    pub live_end: Timestamp,
+    /// Contributing → Refunding
+    pub contribution_end: Timestamp,
+    /// Refunding → Distributing
+    pub refunding_end: Timestamp,
+    /// Distributing → Closed
+    pub distributing_end: Timestamp,
 }
 
 /// Payment denomination accepted by this IDO.
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "contract", borsh(crate = "near_sdk::borsh"))]
 pub enum PaymentToken {
-    /// Native NEAR token (yoctoNEAR).
     Near,
-    /// NEP-141 fungible token at the given contract address.
     Nep141(AccountId),
 }

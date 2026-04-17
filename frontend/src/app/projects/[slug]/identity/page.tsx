@@ -45,7 +45,7 @@ export default function IdentityPage() {
   const [error, setError] = useState<string | null>(null);
   const [policyId, setPolicyId] = useState<number>(0);
   const [policyStatus, setPolicyStatus] = useState<
-    "Upcoming" | "Subscribing" | "Live" | "Closed" | null
+    "Upcoming" | "Subscribing" | "Contributing" | "Refunding" | "Distributing" | "Closed" | null
   >(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);

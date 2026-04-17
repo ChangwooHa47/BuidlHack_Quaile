@@ -67,8 +67,16 @@ fn validate_policy_inputs(
         .panic();
     }
 
-    if sale_config.live_end <= sale_config.subscription_end {
-        PolicyError::InvalidSaleConfig("live_end must be > subscription_end").panic();
+    if sale_config.contribution_end <= sale_config.subscription_end {
+        PolicyError::InvalidSaleConfig("contribution_end must be > subscription_end").panic();
+    }
+
+    if sale_config.refunding_end <= sale_config.contribution_end {
+        PolicyError::InvalidSaleConfig("refunding_end must be > contribution_end").panic();
+    }
+
+    if sale_config.distributing_end <= sale_config.refunding_end {
+        PolicyError::InvalidSaleConfig("distributing_end must be > refunding_end").panic();
     }
 
     if sale_config.total_allocation.0 == 0 {
@@ -88,8 +96,10 @@ fn status_to_u8(s: &PolicyStatus) -> u8 {
     match s {
         PolicyStatus::Upcoming => 0,
         PolicyStatus::Subscribing => 1,
-        PolicyStatus::Live => 2,
-        PolicyStatus::Closed => 3,
+        PolicyStatus::Contributing => 2,
+        PolicyStatus::Refunding => 3,
+        PolicyStatus::Distributing => 4,
+        PolicyStatus::Closed => 5,
     }
 }
 
@@ -116,7 +126,9 @@ impl PolicyRegistry {
         let statuses = [
             PolicyStatus::Upcoming,
             PolicyStatus::Subscribing,
-            PolicyStatus::Live,
+            PolicyStatus::Contributing,
+            PolicyStatus::Refunding,
+            PolicyStatus::Distributing,
             PolicyStatus::Closed,
         ];
         for status in &statuses {
@@ -247,14 +259,33 @@ impl PolicyRegistry {
             }
             PolicyStatus::Subscribing => {
                 if now >= policy.sale_config.subscription_end {
-                    Some(PolicyStatus::Live)
+                    Some(PolicyStatus::Contributing)
                 } else {
                     None
                 }
             }
-            // Live → Closed is handled by mark_closed only
-            // Closed is terminal
-            _ => None,
+            PolicyStatus::Contributing => {
+                if now >= policy.sale_config.contribution_end {
+                    Some(PolicyStatus::Refunding)
+                } else {
+                    None
+                }
+            }
+            PolicyStatus::Refunding => {
+                if now >= policy.sale_config.refunding_end {
+                    Some(PolicyStatus::Distributing)
+                } else {
+                    None
+                }
+            }
+            PolicyStatus::Distributing => {
+                if now >= policy.sale_config.distributing_end {
+                    Some(PolicyStatus::Closed)
+                } else {
+                    None
+                }
+            }
+            PolicyStatus::Closed => None,
         };
 
         if let Some(to_status) = new_status {
@@ -282,7 +313,9 @@ impl PolicyRegistry {
         }
     }
 
-    /// Escrow account only: mark a Live policy as Closed.
+    /// Escrow account only: mark a Distributing policy as Closed.
+    /// Called when the distributing phase should be cut short (e.g., all
+    /// claims and refunds are done before distributing_end).
     pub fn mark_closed(&mut self, id: PolicyId) {
         let escrow = match &self.escrow_account {
             Some(e) => e.clone(),
@@ -298,14 +331,14 @@ impl PolicyRegistry {
             None => PolicyError::PolicyNotFound(id).panic(),
         };
 
-        if policy.status != PolicyStatus::Live {
+        if policy.status != PolicyStatus::Distributing {
             PolicyError::WrongStatusForClose.panic();
         }
 
         let now = env::block_timestamp();
         let from_status = policy.status.clone();
 
-        self.remove_from_status_vec(&PolicyStatus::Live, id);
+        self.remove_from_status_vec(&PolicyStatus::Distributing, id);
 
         let mut closed_vec = self
             .by_status
@@ -353,6 +386,21 @@ impl PolicyRegistry {
     pub fn set_escrow_account(&mut self, escrow: AccountId) {
         self.assert_owner();
         self.escrow_account = Some(escrow);
+    }
+
+    /// Owner only, idempotent: ensure the `by_status` vector for `status` is
+    /// initialized. Safe to call after a schema-adding redeploy (e.g. when the
+    /// 4-phase state is migrated into a 6-phase storage schema). No-op if the
+    /// vector already exists.
+    pub fn init_status_vec(&mut self, status: PolicyStatus) {
+        self.assert_owner();
+        if self.by_status.get(&status).is_some() {
+            return;
+        }
+        let key = StorageKey::ByStatusInner {
+            status: status_to_u8(&status),
+        };
+        self.by_status.insert(&status, &Vector::new(key));
     }
 
     /// Foundation-owner only: edit a policy while it is still Upcoming.

@@ -3,7 +3,9 @@ import type { Phase } from "@/types";
 const phaseConfig: Record<Phase, { dot: string; text: string; glow: string }> = {
   Upcoming: { dot: "bg-status-upcoming", text: "text-status-upcoming", glow: "shadow-[0_0_16px_rgba(107,163,255,0.6)]" },
   Subscribing: { dot: "bg-neon-glow", text: "text-neon-glow", glow: "shadow-[0_0_16px_rgba(200,255,0,0.6)]" },
-  Live: { dot: "bg-[#ff4d6d]", text: "text-[#ff4d6d]", glow: "shadow-[0_0_16px_rgba(255,77,109,0.6)]" },
+  Contributing: { dot: "bg-neon-glow", text: "text-neon-glow", glow: "shadow-[0_0_16px_rgba(200,255,0,0.6)]" },
+  Refunding: { dot: "bg-status-settlement", text: "text-status-settlement", glow: "shadow-[0_0_16px_rgba(178,166,41,0.6)]" },
+  Distributing: { dot: "bg-status-live", text: "text-status-live", glow: "shadow-[0_0_16px_rgba(200,255,0,0.6)]" },
   Closed: { dot: "bg-gray-600", text: "text-gray-700", glow: "" },
 };
 

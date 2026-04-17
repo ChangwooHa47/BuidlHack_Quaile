@@ -38,7 +38,9 @@ export default function AdminNewPolicyPage() {
   const [pricePerToken, setPricePerToken] = useState("500000000000000000000000");
   const [subscriptionStart, setSubscriptionStart] = useState("");
   const [subscriptionEnd, setSubscriptionEnd] = useState("");
-  const [liveEnd, setLiveEnd] = useState("");
+  const [contributionEnd, setContributionEnd] = useState("");
+  const [refundingEnd, setRefundingEnd] = useState("");
+  const [distributingEnd, setDistributingEnd] = useState("");
 
   // Criteria
   const [criteria, setCriteria] = useState<CriteriaGroup[]>([]);
@@ -90,13 +92,15 @@ export default function AdminNewPolicyPage() {
     if (!totalAllocation.trim() || !pricePerToken.trim()) {
       return "Total allocation and price per token are required.";
     }
-    if (!subscriptionStart || !subscriptionEnd || !liveEnd) {
+    if (!subscriptionStart || !subscriptionEnd || !contributionEnd || !refundingEnd || !distributingEnd) {
       return "All three timeline fields are required.";
     }
     const startMs = new Date(subscriptionStart).getTime();
     const endMs = new Date(subscriptionEnd).getTime();
-    const liveMs = new Date(liveEnd).getTime();
-    if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || !Number.isFinite(liveMs)) {
+    const contribMs = new Date(contributionEnd).getTime();
+    const refundMs = new Date(refundingEnd).getTime();
+    const distribMs = new Date(distributingEnd).getTime();
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || !Number.isFinite(contribMs) || !Number.isFinite(refundMs) || !Number.isFinite(distribMs)) {
       return "One of the timeline fields is invalid.";
     }
     if (startMs <= Date.now()) {
@@ -105,8 +109,8 @@ export default function AdminNewPolicyPage() {
     if (endMs - startMs < ONE_HOUR_MS) {
       return "Subscription end must be at least 1 hour after start.";
     }
-    if (liveMs <= endMs) {
-      return "Live end must be after subscription end.";
+    if (contribMs <= endMs) {
+      return "contribution_end must be after subscription_end.";
     }
     if (criteria.length === 0) {
       return "Add at least one criterion before publishing.";
@@ -144,7 +148,9 @@ export default function AdminNewPolicyPage() {
           payment_token: "Near",
           subscription_start: datetimeLocalToNs(subscriptionStart),
           subscription_end: datetimeLocalToNs(subscriptionEnd),
-          live_end: datetimeLocalToNs(liveEnd),
+          contribution_end: datetimeLocalToNs(contributionEnd),
+          refunding_end: datetimeLocalToNs(refundingEnd),
+          distributing_end: datetimeLocalToNs(distributingEnd),
         },
       );
       // MyNearWallet redirect handles the flow; on resume we land on /admin
@@ -208,7 +214,7 @@ export default function AdminNewPolicyPage() {
             <TextField label="Price per Token (yocto)" value={pricePerToken} onChange={setPricePerToken} required />
             <TextField label="Subscription Start" value={subscriptionStart} onChange={setSubscriptionStart} type="datetime-local" required />
             <TextField label="Subscription End" value={subscriptionEnd} onChange={setSubscriptionEnd} type="datetime-local" required />
-            <TextField label="Live End" value={liveEnd} onChange={setLiveEnd} type="datetime-local" required />
+            
           </div>
         </section>
 

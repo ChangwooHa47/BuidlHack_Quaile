@@ -98,7 +98,9 @@ export default async function ProjectDetailPage({
                     { label: "Payment", value: typeof policy.sale_config.payment_token === "string" ? policy.sale_config.payment_token : "NEP-141" },
                     { label: "Subscription Start", value: formatDate(policy.sale_config.subscription_start) },
                     { label: "Subscription End", value: formatDate(policy.sale_config.subscription_end) },
-                    { label: "Live End", value: formatDate(policy.sale_config.live_end) },
+                    { label: "Contribution End", value: formatDate(policy.sale_config.contribution_end) },
+                    { label: "Refunding End", value: formatDate(policy.sale_config.refunding_end) },
+                    { label: "Distributing End", value: formatDate(policy.sale_config.distributing_end) },
                   ].map(({ label, value }) => (
                     <div key={label} className="flex items-center justify-between py-sm">
                       <span className="text-sm text-gray-600">{label}</span>

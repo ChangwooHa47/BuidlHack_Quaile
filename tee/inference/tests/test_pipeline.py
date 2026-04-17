@@ -78,7 +78,9 @@ class StubPolicyFetcher:
                 payment_token="Near",
                 subscription_start=NOW_NS - 1_000_000_000,
                 subscription_end=NOW_NS + 3_600_000_000_000,
-                live_end=NOW_NS + 7_200_000_000_000,
+                contribution_end=NOW_NS + 5_400_000_000_000,
+                refunding_end=NOW_NS + 6_300_000_000_000,
+                distributing_end=NOW_NS + 7_200_000_000_000,
             ),
             status="Subscribing",
             created_at=NOW_NS - 10_000_000_000,
@@ -292,13 +294,16 @@ async def test_attest_happy_path_with_mocks():
     assert len(zk_input["criteria"]) == 10
     assert zk_input["criteria_count"] == "3"
     report_calls = app.state.services.deps.report_client.calls
-    assert report_calls[0][1] == persona["nonce"].removeprefix("0x")
-    assert report_calls[1][1] == payload_hash.removeprefix("0x")
+    # First fetch_report removed in PR #47; only one call remains
+    assert report_calls[0][1] == payload_hash.removeprefix("0x")
     assert app.state.services.deps.llm_client.calls == ["structurize", "judge"]
 
 
 @pytest.mark.asyncio
-async def test_attest_rejects_before_llm_when_remote_attestation_fails():
+async def test_attest_rejects_when_remote_attestation_fails():
+    """Remote attestation fetch now happens after LLM judge, so LLM calls
+    are expected even when the report fails. The endpoint should still
+    return 502."""
     app = make_app(report_fail=True)
     persona = _persona_dict()
     async with AsyncClient(
@@ -306,7 +311,6 @@ async def test_attest_rejects_before_llm_when_remote_attestation_fails():
     ) as client:
         resp = await client.post("/v1/attest", json=persona)
     assert resp.status_code == 502
-    assert app.state.services.deps.llm_client.calls == []
 
 
 @pytest.mark.asyncio

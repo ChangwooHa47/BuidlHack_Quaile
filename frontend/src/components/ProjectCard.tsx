@@ -55,7 +55,10 @@ export default function ProjectCard({
         {phase === "Subscribing" && (
           <SubscribingBody saleInfo={saleInfo} />
         )}
-        {phase === "Live" && (
+        {phase === "Contributing" && (
+          <SubscribingBody saleInfo={saleInfo} />
+        )}
+        {(phase === "Refunding" || phase === "Distributing") && (
           <LiveBody saleInfo={saleInfo} />
         )}
         {phase === "Closed" && (
@@ -141,14 +144,12 @@ function ClosedBody({ saleInfo }: { saleInfo: ProjectMeta["saleInfo"] }) {
 /* ── CTA: 1개 버튼, Status 기반 ── */
 function CardCTA({ status }: { status: Status }) {
   const config: Record<Status, { label: string; style: string }> = {
-    Subscription: { label: "Subscribe",     style: "bg-neon-glow text-gray-0" },
-    Upcoming:     { label: "Notify Me",     style: "bg-neon-glow text-gray-0" },
-    Pending:      { label: "Reviewing...",  style: "bg-gray-150 text-alpha-40 cursor-default" },
-    Contribution: { label: "Contribute",    style: "bg-neon-glow text-gray-0" },
-    Settlement:   { label: "Processing...", style: "bg-gray-150 text-alpha-40 cursor-default" },
-    Refund:       { label: "Refund",        style: "bg-gray-1000 text-gray-0" },
-    Claim:        { label: "Claim",         style: "bg-neon-glow text-gray-0" },
-    Closed:       { label: "Sale Ended",    style: "bg-gray-150 text-alpha-40 cursor-default" },
+    Upcoming:      { label: "Notify Me",      style: "bg-neon-glow text-gray-0" },
+    Subscribing:   { label: "Subscribe",     style: "bg-neon-glow text-gray-0" },
+    Contributing:  { label: "Contribute",    style: "bg-neon-glow text-gray-0" },
+    Refunding:     { label: "Processing...", style: "bg-gray-150 text-alpha-40 cursor-default" },
+    Distributing:  { label: "Claim",         style: "bg-neon-glow text-gray-0" },
+    Closed:        { label: "Sale Ended",    style: "bg-gray-150 text-alpha-40 cursor-default" },
   };
   const { label, style } = config[status];
   return (

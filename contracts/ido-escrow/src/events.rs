@@ -5,6 +5,21 @@ fn hex_encode(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
+pub fn emit_subscribed(
+    investor: &str,
+    policy_id: PolicyId,
+    attestation_hash: &[u8; 32],
+    timestamp: u64,
+) {
+    env::log_str(&format!(
+        r#"EVENT_JSON:{{"standard":"nep297","version":"1.0.0","event":"Subscribed","data":{{"investor":"{}","policy_id":{},"attestation_hash":"{}","timestamp":{}}}}}"#,
+        investor,
+        policy_id,
+        hex_encode(attestation_hash),
+        timestamp
+    ));
+}
+
 pub fn emit_contribution_created(
     investor: &str,
     policy_id: PolicyId,

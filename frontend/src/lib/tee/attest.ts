@@ -24,6 +24,13 @@ export interface ZkCircuitInput {
   payload_hash_limbs: string[];
   criteria: number[];
   criteria_count: string;
+  /**
+   * Minimum number of passing criteria required for eligibility. Set by the
+   * TEE based on `[THRESHOLD:N]` in the policy's natural_language; falls back
+   * to `criteria_count` (all must pass) when the policy omits the marker.
+   * Private input to the circuit — never leaves the proof.
+   */
+  threshold: string;
 }
 
 export interface AttestationResponse {

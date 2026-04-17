@@ -36,7 +36,7 @@ pub struct PolicyTotalsView {
 #[near_bindgen]
 impl IdoEscrow {
     /// Permissionless keeper: settle contributions for a policy.
-    /// Must be called after advance_status has moved the policy to Live.
+    /// Must be called during the Refunding phase (after Contributing ends).
     pub fn settle(
         &mut self,
         policy_id: PolicyId,
@@ -73,12 +73,12 @@ impl IdoEscrow {
         let is_first = self.policy_totals.get(&policy_id).is_none();
         if is_first {
             require!(
-                env::block_timestamp() >= policy.sale_config.subscription_end,
+                env::block_timestamp() >= policy.sale_config.contribution_end,
                 "NotReadyForSettlement"
             );
             require!(
-                policy.status == PolicyStatus::Live,
-                "WrongPolicyStatus: must be Live"
+                policy.status == PolicyStatus::Refunding,
+                "WrongPolicyStatus: must be Refunding"
             );
 
             let total_demand = self
@@ -133,6 +133,9 @@ impl IdoEscrow {
             };
             if contribution.outcome != ContributionOutcome::NotSettled {
                 continue; // already settled somehow
+            }
+            if contribution.amount.0 == 0 {
+                continue; // subscribed but never contributed — skip
             }
 
             let matched = (U256::from(contribution.amount.0) * U256::from(totals.ratio_bps)
@@ -193,16 +196,20 @@ impl IdoEscrow {
                 now,
             );
 
-            // mark_closed cross-contract call
-            let promise = ext_policy_registry::ext(self.policy_registry.clone())
-                .with_static_gas(GAS_MARK_CLOSED)
-                .mark_closed(policy_id)
-                .then(
-                    ext_self::ext(env::current_account_id())
-                        .with_static_gas(GAS_MARK_CLOSED_CALLBACK)
-                        .on_mark_closed_result(policy_id),
-                );
-            PromiseOrValue::Promise(promise)
+            // Phase transitions are now time-based via advance_status.
+            // No mark_closed call — the policy moves through Refunding →
+            // Distributing → Closed based on SaleConfig timestamps.
+            let totals_ref = self.policy_totals.get(&policy_id).unwrap();
+            PromiseOrValue::Value(SettleProgress {
+                processed: count,
+                total: count,
+                is_complete: true,
+                totals: Some(PolicyTotalsView {
+                    total_demand: totals_ref.total_demand,
+                    total_matched: totals_ref.total_matched,
+                    ratio_bps: totals_ref.ratio_bps,
+                }),
+            })
         } else {
             PromiseOrValue::Value(SettleProgress {
                 processed: batch_size,

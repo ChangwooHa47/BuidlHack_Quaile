@@ -97,7 +97,9 @@ class PolicySaleConfigModel(BaseModel):
     payment_token: str | dict
     subscription_start: int
     subscription_end: int
-    live_end: int
+    contribution_end: int
+    refunding_end: int
+    distributing_end: int
 
     @field_validator("total_allocation", "price_per_token", mode="before")
     @classmethod
@@ -113,7 +115,7 @@ class PolicyModel(BaseModel):
     natural_language: str
     ipfs_cid: str
     sale_config: PolicySaleConfigModel
-    status: Literal["Upcoming", "Subscribing", "Live", "Closed"]
+    status: Literal["Upcoming", "Subscribing", "Contributing", "Refunding", "Distributing", "Closed"]
     created_at: int
 
 
@@ -346,10 +348,16 @@ class AttestationBundleWithReportModel(BaseModel):
 
 
 class ZkCircuitInputModel(BaseModel):
-    """Client uses this to generate a snarkjs groth16 proof."""
+    """Client uses this to generate a snarkjs groth16 proof.
+
+    The circuit proves: sum(criteria[0..criteria_count]) >= threshold.
+    `criteria_count` and `threshold` are private inputs; the resulting
+    `eligible` bit is the only value that surfaces on-chain.
+    """
     payload_hash_limbs: list[str]  # 4 x 64-bit limbs (decimal string)
     criteria: list[int]            # [1,1,1,0,...] MAX_CRITERIA entries, 0 or 1
-    criteria_count: str            # decimal string
+    criteria_count: str            # decimal string — length of active window
+    threshold: str                 # decimal string — minimum passes required
 
 
 class AttestationResponseModel(BaseModel):

@@ -9,7 +9,9 @@ const FILTERS: Array<{ label: string; phase: Phase | null }> = [
   { label: "All", phase: null },
   { label: "Upcoming", phase: "Upcoming" },
   { label: "Subscribing", phase: "Subscribing" },
-  { label: "Live", phase: "Live" },
+  { label: "Contributing", phase: "Contributing" },
+  { label: "Refunding", phase: "Refunding" },
+  { label: "Distributing", phase: "Distributing" },
   { label: "Closed", phase: "Closed" },
 ];
 

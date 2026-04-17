@@ -19,9 +19,11 @@ export interface OnChainPolicy {
     payment_token: "Near" | { Nep141: string };
     subscription_start: number;
     subscription_end: number;
-    live_end: number;
+    contribution_end: number;
+    refunding_end: number;
+    distributing_end: number;
   };
-  status: "Upcoming" | "Subscribing" | "Live" | "Closed";
+  status: "Upcoming" | "Subscribing" | "Contributing" | "Refunding" | "Distributing" | "Closed";
   created_at: number;
 }
 
@@ -48,25 +50,36 @@ export interface PolicyTotals {
 }
 
 /**
- * Fetch all policies by iterating from id=0 until null.
- * No `get_all_policies` view exists on-chain.
+ * Fetch all policies by probing ids in parallel up to the registry's
+ * next_policy_id. The registry assigns ids sequentially, but deletions leave
+ * gaps — so a single null no longer means "end of list".
  */
 export async function getAllPolicies(): Promise<OnChainPolicy[]> {
-  const policies: OnChainPolicy[] = [];
-  for (let id = 0; ; id++) {
-    try {
-      const policy = await viewCall<OnChainPolicy | null>(
+  let upperBound: number;
+  try {
+    const total = await viewCall<number>(
+      CONTRACT_IDS.policyRegistry,
+      "total_policies",
+      {},
+    );
+    // next_policy_id is monotonically increasing, so current id-space is
+    // [0, total + slack). Slack covers policies deleted from the live set.
+    upperBound = Math.max(Number(total) + 16, 32);
+  } catch {
+    upperBound = 32;
+  }
+
+  const ids = Array.from({ length: upperBound }, (_, i) => i);
+  const results = await Promise.all(
+    ids.map((id) =>
+      viewCall<OnChainPolicy | null>(
         CONTRACT_IDS.policyRegistry,
         "get_policy",
         { id },
-      );
-      if (!policy) break;
-      policies.push(policy);
-    } catch {
-      break;
-    }
-  }
-  return policies;
+      ).catch(() => null),
+    ),
+  );
+  return results.filter((p): p is OnChainPolicy => p !== null);
 }
 
 export async function getPolicy(id: number): Promise<OnChainPolicy | null> {

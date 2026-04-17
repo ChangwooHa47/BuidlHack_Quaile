@@ -12,7 +12,7 @@ import {
 } from "@/lib/near/contracts";
 import { slugOf } from "@/lib/slug";
 
-const PHASES = ["Upcoming", "Subscribing", "Live", "Closed"] as const;
+const PHASES = ["Upcoming", "Subscribing", "Contributing", "Refunding", "Distributing", "Closed"] as const;
 
 function formatNear(yocto: string): string {
   const near = Number(BigInt(yocto) / BigInt(10 ** 21)) / 1000;
@@ -141,7 +141,9 @@ export default function AdminProjectPage() {
                 <TimeRow label="Price per Token" value={policy.sale_config.price_per_token} />
                 <TimeRow label="Subscription Start" value={formatDate(policy.sale_config.subscription_start)} />
                 <TimeRow label="Subscription End" value={formatDate(policy.sale_config.subscription_end)} />
-                <TimeRow label="Live End" value={formatDate(policy.sale_config.live_end)} />
+                <TimeRow label="Contribution End" value={formatDate(policy.sale_config.contribution_end)} />
+                <TimeRow label="Refunding End" value={formatDate(policy.sale_config.refunding_end)} />
+                <TimeRow label="Distributing End" value={formatDate(policy.sale_config.distributing_end)} />
               </div>
             </div>
 

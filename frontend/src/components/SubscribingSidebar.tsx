@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import StatusBadge from "./StatusBadge";
 import ContributeButton from "./ContributeButton";
+import SubscribeButton from "./SubscribeButton";
 import { useWallet } from "@/contexts/WalletContext";
 import { useIdentity } from "@/contexts/IdentityContext";
 import { getContribution, type OnChainContribution } from "@/lib/near/contracts";
@@ -21,10 +22,12 @@ interface SubscribingSidebarProps {
 
 // See planning/INVESTOR_FLOW.md §3 for the full state-machine table.
 type Flow =
-  | "identity"
-  | "rejected"
-  | "contribute"
-  | "waiting"
+  | "identity"    // no attestation, phase Subscribing → "Build Identity"
+  | "rejected"    // Ineligible flag set
+  | "subscribe"   // attestation ready, phase Subscribing → "Subscribe"
+  | "subscribed"  // on-chain contribution w/ amount=0, phase still Subscribing
+  | "contribute"  // phase Contributing, ready to deposit
+  | "waiting"     // deposit made, waiting for settlement
   | "claim"
   | "refund"
   | "done";
@@ -44,7 +47,15 @@ export default function SubscribingSidebar({ name, ticker, status, policyId, slu
       if (cancelled) return;
       setContribution(c);
       if (c) {
-        // Contribution exists — on-chain is the source of truth for the rest.
+        // On-chain record exists. Two sub-cases:
+        //  - amount == "0"  → subscribed only, waiting for Contributing phase
+        //  - amount >  "0"  → already contributed, follow outcome path
+        const amountIsZero = BigInt(c.amount) === 0n;
+        if (amountIsZero) {
+          // Subscribed, not yet funded. Flow depends on the current phase.
+          setFlow(status === "Contributing" ? "contribute" : "subscribed");
+          return;
+        }
         if (c.outcome === "NotSettled") {
           setFlow("waiting");
         } else if (
@@ -62,14 +73,13 @@ export default function SubscribingSidebar({ name, ticker, status, policyId, slu
         }
         return;
       }
-      // No contribution yet — consult localStorage in the order prescribed
-      // by INVESTOR_FLOW §5: ineligible flag first, then attestation.
+      // No on-chain record — consult localStorage (INVESTOR_FLOW §5).
       if (isIneligible(policyId)) {
         setFlow("rejected");
         return;
       }
       if (loadAttestation(policyId, accountId)) {
-        setFlow("contribute");
+        setFlow("subscribe");
         return;
       }
       setFlow("identity");
@@ -77,7 +87,7 @@ export default function SubscribingSidebar({ name, ticker, status, policyId, slu
     return () => {
       cancelled = true;
     };
-  }, [accountId, policyId]);
+  }, [accountId, policyId, status]);
 
   async function handleClaim() {
     if (!selector || policyId === undefined) return;
@@ -185,8 +195,61 @@ export default function SubscribingSidebar({ name, ticker, status, policyId, slu
         </div>
       )}
 
-      {flow === "contribute" && policyId !== undefined && (
+      {flow === "subscribe" && policyId !== undefined && status === "Subscribing" && (
+        <SubscribeButton policyId={policyId} />
+      )}
+
+      {flow === "subscribe" && policyId !== undefined && status !== "Subscribing" && (
+        <div className="space-y-xs">
+          <button
+            type="button"
+            disabled
+            className="w-full rounded-lg border border-alpha-12 py-2.5 text-sm font-medium text-alpha-40 cursor-not-allowed"
+          >
+            Subscribe
+          </button>
+          <p className="text-center text-xs text-alpha-60">
+            The Subscribing window has closed for this policy.
+          </p>
+        </div>
+      )}
+
+      {flow === "subscribed" && (
+        <div className="space-y-xs">
+          <div className="rounded-lg border border-neon-glow/30 bg-neon-glow/5 px-md py-sm">
+            <p className="text-sm font-medium text-neon-glow">Subscription sealed</p>
+            <p className="mt-xs text-xs text-alpha-60">
+              Your ZK-verified eligibility is on-chain. Contribute opens when the
+              Contributing phase begins.
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled
+            className="w-full rounded-lg border border-alpha-12 py-2.5 text-sm font-medium text-alpha-40 cursor-not-allowed"
+          >
+            Contribute
+          </button>
+        </div>
+      )}
+
+      {flow === "contribute" && policyId !== undefined && status === "Contributing" && (
         <ContributeButton policyId={policyId} />
+      )}
+
+      {flow === "contribute" && policyId !== undefined && status !== "Contributing" && (
+        <div className="space-y-xs">
+          <button
+            type="button"
+            disabled
+            className="w-full rounded-lg border border-alpha-12 py-2.5 text-sm font-medium text-alpha-40 cursor-not-allowed"
+          >
+            Contribute
+          </button>
+          <p className="text-center text-xs text-alpha-60">
+            The Contributing window has closed for this policy.
+          </p>
+        </div>
       )}
 
       {flow === "waiting" && (

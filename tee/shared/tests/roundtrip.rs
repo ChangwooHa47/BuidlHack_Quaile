@@ -37,7 +37,9 @@ fn dummy_sale_config() -> SaleConfig {
         payment_token: PaymentToken::Near,
         subscription_start: 1_000,
         subscription_end: 2_000,
-        live_end: 3_000,
+        contribution_end: 3_000,
+        refunding_end: 4_000,
+        distributing_end: 5_000,
     }
 }
 
@@ -216,8 +218,8 @@ fn invariant_sale_config_time_ordering() {
         "subscription_start must precede subscription_end"
     );
     assert!(
-        c.subscription_end < c.live_end,
-        "subscription_end must precede live_end"
+        c.subscription_end < c.contribution_end && c.contribution_end < c.refunding_end && c.refunding_end < c.distributing_end,
+        "time boundaries must be strictly ordered"
     );
 }
 

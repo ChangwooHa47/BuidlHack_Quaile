@@ -111,7 +111,9 @@ export default function AdminCriteriaPage() {
           payment_token: policy.sale_config.payment_token,
           subscription_start: policy.sale_config.subscription_start,
           subscription_end: policy.sale_config.subscription_end,
-          live_end: policy.sale_config.live_end,
+          contribution_end: policy.sale_config.contribution_end,
+          refunding_end: policy.sale_config.refunding_end,
+          distributing_end: policy.sale_config.distributing_end,
         },
       );
       alert("Criteria updated!");

@@ -39,7 +39,9 @@ fn valid_sale_config(now: u64, start_offset_ns: u64) -> SaleConfig {
         payment_token: PaymentToken::Near,
         subscription_start: now + start_offset_ns,
         subscription_end: now + start_offset_ns + 7_200_000_000_000,   // +2 h
-        live_end: now + start_offset_ns + 14_400_000_000_000,          // +4 h
+        contribution_end: now + start_offset_ns + 10_800_000_000_000,  // +3 h
+        refunding_end: now + start_offset_ns + 12_600_000_000_000,    // +3.5 h
+        distributing_end: now + start_offset_ns + 14_400_000_000_000, // +4 h
     }
 }
 

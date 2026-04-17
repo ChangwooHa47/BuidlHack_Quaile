@@ -1,6 +1,6 @@
 import Header from "@/components/Header";
 import FilterTabs from "@/components/FilterTabs";
-import type { ProjectMeta } from "@/types";
+import type { ProjectMeta, Status } from "@/types";
 import { getAllPolicies, getPolicyInvestorCount, getPolicyPendingTotal, type OnChainPolicy } from "@/lib/near/contracts";
 import { slugOf } from "@/lib/slug";
 
@@ -22,7 +22,7 @@ function policyToProject(policy: OnChainPolicy, subscribers: number, pendingTota
     ticker: policy.ticker,
     chain: policy.chain,
     description: policy.description,
-    status: policy.status === "Upcoming" ? "Upcoming" : policy.status === "Subscribing" ? "Subscription" : policy.status === "Live" ? "Settlement" : "Closed",
+    status: policy.status as Status,
     saleInfo: {
       target: `${target} NEAR`,
       totalSubscription: `${contributed} NEAR`,

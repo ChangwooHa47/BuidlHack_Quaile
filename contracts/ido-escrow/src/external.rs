@@ -26,16 +26,17 @@ pub trait FungibleTokenExt {
 
 #[ext_contract(ext_self)]
 pub trait IdoEscrowCallbacks {
-    fn on_get_policy(
+    // ── Stage 1: subscribe ────────────────────────────────────────────────
+    fn on_get_policy_for_subscribe(
         &mut self,
         policy_id: PolicyId,
         investor: AccountId,
         bundle: AttestationBundle,
         zk_proof_json: String,
         zk_public_inputs_json: String,
-    ) -> Promise;
+    ) -> PromiseOrValue<bool>;
 
-    fn on_verify_signature(
+    fn on_verify_signature_for_subscribe(
         &mut self,
         policy_id: PolicyId,
         investor: AccountId,
@@ -44,17 +45,26 @@ pub trait IdoEscrowCallbacks {
         nonce: [u8; 32],
         zk_proof_json: String,
         zk_public_inputs_json: String,
-    ) -> Promise;
+    ) -> PromiseOrValue<bool>;
 
-    fn on_zk_verified(
+    fn on_zk_verified_for_subscribe(
         &mut self,
         policy_id: PolicyId,
         investor: AccountId,
         subscription_end: Timestamp,
         attestation_hash: Hash32,
         nonce: [u8; 32],
+    ) -> bool;
+
+    // ── Stage 2: contribute ──────────────────────────────────────────────
+    fn on_get_policy_for_contribute(
+        &mut self,
+        policy_id: PolicyId,
+        investor: AccountId,
+        amount: U128,
     ) -> PromiseOrValue<bool>;
 
+    // ── Settlement ───────────────────────────────────────────────────────
     fn on_get_policy_for_settle(
         &mut self,
         policy_id: PolicyId,
@@ -66,6 +76,7 @@ pub trait IdoEscrowCallbacks {
         policy_id: PolicyId,
     ) -> crate::settlement::SettleProgress;
 
+    // ── Claim / Refund ───────────────────────────────────────────────────
     fn on_ft_transfer_for_claim(
         &mut self,
         investor: AccountId,

@@ -51,29 +51,47 @@ const GAS_SETTLE = BigInt("300000000000000");
 const NO_DEPOSIT = BigInt(0);
 
 /**
- * Call ido-escrow.contribute() with attestation bundle + ZK proof.
- *
- * NOTE: zk_proof_json and zk_public_inputs_json must be JSON *strings*
- * (not objects), matching the Rust `String` parameter type.
+ * Stage 1: subscribe (Subscribing phase).
+ * Pushes the attestation bundle + ZK proof on-chain without a deposit.
+ * The contract records a Contribution entry with amount=0.
  */
-export async function contribute(
+export async function subscribe(
   wallet: Wallet,
   policyId: number,
   bundle: object,
   zkProofJson: string,
   zkPublicInputsJson: string,
-  depositNear: string,
 ) {
   return callContract(
     wallet,
     CONTRACT_IDS.idoEscrow,
-    "contribute",
+    "subscribe",
     {
       policy_id: policyId,
       bundle,
       zk_proof_json: zkProofJson,
       zk_public_inputs_json: zkPublicInputsJson,
     },
+    GAS_CONTRIBUTE,
+    NO_DEPOSIT,
+  );
+}
+
+/**
+ * Stage 2: contribute (Contributing phase).
+ * Attaches a NEAR deposit to an already-subscribed entry.
+ * The investor must have called `subscribe()` during the Subscribing phase.
+ */
+export async function contribute(
+  wallet: Wallet,
+  policyId: number,
+  depositNear: string,
+) {
+  return callContract(
+    wallet,
+    CONTRACT_IDS.idoEscrow,
+    "contribute",
+    { policy_id: policyId },
     GAS_CONTRIBUTE,
     BigInt(parseNearAmount(depositNear)),
   );
@@ -86,7 +104,9 @@ export interface SaleConfigArgs {
   payment_token: "Near" | { Nep141: string };
   subscription_start: number;
   subscription_end: number;
-  live_end: number;
+  contribution_end: number;
+  refunding_end: number;
+  distributing_end: number;
 }
 
 export async function registerPolicy(
@@ -154,7 +174,7 @@ export async function updatePolicy(
 export async function forceStatus(
   wallet: Wallet,
   policyId: number,
-  status: "Upcoming" | "Subscribing" | "Live" | "Closed",
+  status: "Upcoming" | "Subscribing" | "Contributing" | "Refunding" | "Distributing" | "Closed",
 ) {
   return callContract(
     wallet,

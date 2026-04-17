@@ -160,12 +160,18 @@ def payload_hash_to_limbs(h: bytes) -> list[str]:
 
 
 def build_zk_input(
-    payload_hash: bytes, criteria_results: CriteriaResultsModel
+    payload_hash: bytes,
+    criteria_results: CriteriaResultsModel,
+    threshold: int | None,
 ) -> ZkCircuitInputModel:
+    # When the policy didn't declare a threshold, default to "all active
+    # criteria must pass" — the semantics of the pre-threshold circuit.
+    effective_threshold = threshold if threshold is not None else criteria_results.count
     return ZkCircuitInputModel(
         payload_hash_limbs=payload_hash_to_limbs(payload_hash),
         criteria=[1 if r else 0 for r in criteria_results.results],
         criteria_count=str(criteria_results.count),
+        threshold=str(effective_threshold),
     )
 
 
@@ -204,7 +210,7 @@ async def process_persona(
                 f"policy status must be Subscribing, got {policy.status}"
             )
         if now >= policy.sale_config.subscription_end:
-            raise PolicyValidationError("policy subscription window is closed")
+            raise PolicyValidationError("subscription window is closed")
 
         github_errors: list[str] = []
 
@@ -263,7 +269,7 @@ async def process_persona(
             policy_id=persona.policy_id,
             verdict=judge_out.verdict,
             issued_at=now,
-            expires_at=policy.sale_config.subscription_end,
+            expires_at=policy.sale_config.contribution_end,
             nonce=persona.nonce,
             criteria_results=criteria_results,
             payload_version=PAYLOAD_VERSION,
@@ -274,11 +280,14 @@ async def process_persona(
         if digest != bundle.payload_hash:
             raise AssertionError("signer payload_hash mismatch")
 
-        tee_report = await deps.report_client.fetch_report(
-            signing_address=deps.signer.address,
-            nonce_hex=bundle.payload_hash.hex(),
-        )
-        zk_input = build_zk_input(digest, criteria_results)
+        try:
+            tee_report = await deps.report_client.fetch_report(
+                signing_address=deps.signer.address,
+                nonce_hex=bundle.payload_hash.hex(),
+            )
+        except Exception as exc:
+            raise RemoteAttestationFailed(str(exc)) from exc
+        zk_input = build_zk_input(digest, criteria_results, threshold)
         return AttestationResponseModel(
             bundle=bundle, tee_report=tee_report, zk_input=zk_input
         )
