@@ -1,19 +1,20 @@
 # Qualie
 
-> **Private, AI-Judged IDO Launchpad on NEAR.**
-> Foundations describe the investors they want in plain language. An AI running inside a Trusted Execution Environment screens each applicant against their on-chain history across NEAR and major EVM chains. A zero-knowledge proof then compresses the verdict into a single bit on-chain — no wallet address, no bio, no trace of the evaluation itself ever leaves the enclave.
+> **AI Evaluation That Nobody Gets to Keep.**
+> A private, AI-judged IDO launchpad on NEAR — designed around a four-party conflict of interests that no existing launchpad has solved at once.
 
 Submitted to **BuidlHack 2026 — Korea Buidl Week · NEAR AI / General Track**.
 
-- **Deployed contracts (NEAR testnet):** `policy.rockettheraccon.testnet`, `attestation-verifier.rockettheraccon.testnet`, `zkverifier.rockettheraccon.testnet`, `escrow.rockettheraccon.testnet`, `mockft.rockettheraccon.testnet`
+- **Deployed contracts (NEAR testnet):** `policy.rockettheraccon.testnet`, `verifier.rockettheraccon.testnet`, `zkverifier.rockettheraccon.testnet`, `escrow.rockettheraccon.testnet`, `mockft.rockettheraccon.testnet`
 - **Demo video:** _linked from the BuidlHack submission page_
 
 ---
 
 ## Table of Contents
-- [The Problem](#the-problem)
+- [The Problem — a four-way conflict of interests](#the-problem--a-four-way-conflict-of-interests)
 - [The Solution](#the-solution)
-- [How It Works — the Full Lifecycle](#how-it-works--the-full-lifecycle)
+- [Why an IDO launchpad is the right first application](#why-an-ido-launchpad-is-the-right-first-application)
+- [Lifecycle](#lifecycle)
 - [Privacy Model](#privacy-model--the-property-that-matters-most)
 - [Architecture](#architecture)
 - [Tech Stack](#tech-stack)
@@ -25,39 +26,42 @@ Submitted to **BuidlHack 2026 — Korea Buidl Week · NEAR AI / General Track**.
 
 ---
 
-## The Problem
+## The Problem — a four-way conflict of interests
 
-Today's IDO launchpads (Legion, Echo, Buidlpad) decide who gets an allocation by **staking tier**. If your wallet holds enough of the launchpad's token, you get in. If not, you don't.
+Allocating an IDO the right way requires judging investors. That judgment pulls four parties in incompatible directions:
 
-This is a bad system for three reasons.
+- **The foundation** wants **more information**. The more they know about an investor, the better they can pick the right allocation.
+- **The investor** wants **less information to accumulate**. Every bit of wallet history, self-introduction, and GitHub activity aggregated somewhere is leverage against them later.
+- **The launchpad** must **not see the investor's data at all**. Any custodial access turns it into the next honeypot and the next data-broker lawsuit.
+- **The AI performing the evaluation** must **not retain anything**. Raw persona, intermediate reasoning, draft verdicts — none of it can persist, or we've just moved the problem one hop.
 
-- **Foundations lose sovereignty.** A DeFi protocol that wants "long-term holders who have voted in at least three DAOs" has no way to express that. The launchpad owns the selection criteria, not the issuer.
-- **Whales dominate.** Staking-weighted allocations concentrate supply in the wallets that least need it and most immediately dump.
-- **Privacy is broken.** The only way today to run a real quality check is to hand over wallet lists, KYC documents, and behavioral data to a third party. Once it's out of the user's hands, it's out forever.
+Every existing launchpad picks one side. KYC-style platforms side with the foundation (data aggregated, investors exposed). Anonymous staking-tier platforms side with investors (no real evaluation possible). AI-assisted platforms side with themselves (the AI provider holds all the logs). **Nobody has solved all four at once.**
 
-These three problems share one root: **running a thoughtful quality check on an investor requires reading their on-chain history, and reading their history requires someone to see it.** Until now.
+That is what Qualie solves.
 
 ## The Solution
 
-Qualie separates three jobs that were previously fused:
+Four mechanisms, one per party:
 
-1. **The foundation** writes criteria in plain English — _"long-term DeFi holders with DAO participation history, builders preferred"_ — and publishes them on-chain.
-2. **A Trusted Execution Environment** reads the criteria, fetches the investor's multi-chain history directly from RPCs, asks an LLM (running inside a second TEE, NEAR AI Cloud) to evaluate each criterion, and signs the verdict. **The raw data is wiped from memory the moment the response is sent.**
-3. **A zero-knowledge proof** generated in the investor's browser wraps the 10-bit pass/fail vector. Only one bit — `eligible: true/false` — ever reaches the chain, behind a Groth16 proof verified on-chain.
+1. **The foundation gets broad information.** They write selection criteria in plain English. The AI reads those criteria and pulls the investor's full on-chain history — NEAR plus six EVM chains — and evaluates every criterion. The foundation's reach is *maximum*.
 
-The foundation learns that _N people passed_. The investor learns they _passed_. The chain stores _one bit_. Nobody, including the team that built Qualie, can reconstruct who submitted what.
+2. **No identifying data ever accumulates for the investor.** The persona enters a Trusted Execution Environment over a single attested request and exits as a signed verdict. The raw fields are zeroed in a `finally` block of the pipeline. There is no disk write, no log, no cache.
 
-Three properties that weren't possible before:
+3. **The launchpad never sees the investor.** Qualie runs no off-enclave database of personas. The launchpad operator cannot impersonate the TEE — the signing key is either generated inside the CVM or injected under attestation. The foundation's dashboard shows aggregate counts only: *N eligible subscribers*, no addresses.
 
-- **Foundation sovereignty without breaking privacy.** Foundations define criteria; they never see investors.
-- **Merit-based allocation.** Criteria can encode long-term behavior, governance participation, builder contributions — anything the LLM can judge against on-chain signals.
-- **Portable eligibility.** Today the attestation gates one Qualie IDO. The signed bundle is a standalone artifact; future launchpads can accept it as proof of prior vetting without re-running the screen.
+4. **The AI evaluation itself leaves no trace.** The LLM runs inside NEAR AI Cloud's TEE; Qualie cross-attests with it before sending the self-introduction. The model's output is a signed 10-bit pass/fail vector that immediately gets compressed into a Groth16 proof. On-chain, only **one bit** survives — `eligible` — behind a ZK proof. The criteria that passed, the criteria that failed, the reasoning, the confidence — all of it dies with the request.
+
+The result is a system where the foundation evaluates an investor deeply, the investor exposes nothing durable, the launchpad sees nothing it could be compelled to disclose, and the AI's verdict cannot be reconstructed by anyone — including the team that built Qualie.
+
+## Why an IDO launchpad is the right first application
+
+IDOs are where all four pressures collide with real money attached. A DeFi protocol launching a token genuinely wants "long-term holders who've voted in three DAOs"; investors genuinely don't want their wallet tree on a launchpad's server; launchpads genuinely get breached; and AI-assisted vetting is already being used badly. Qualie is the minimum viable shape of a primitive that generalizes beyond IDOs — to any gated action where *the evaluation has to happen but nobody gets to keep the evidence*.
 
 ---
 
-## How It Works — the Full Lifecycle
+## Lifecycle
 
-Qualie's policy goes through six on-chain phases. Each phase has a specific contract gate, and the UI mirrors the contract exactly — investors cannot accidentally trigger a phase-invalid action.
+A Qualie policy moves through six on-chain phases. The UI mirrors the contract exactly — investors cannot accidentally trigger a phase-invalid action:
 
 ```
 Upcoming ─→ Subscribing ─→ Contributing ─→ Refunding ─→ Distributing ─→ Closed
@@ -125,9 +129,9 @@ This is the part that took the most design work, and it's the part that makes Qu
 
 | Actor | Can see |
 |---|---|
-| **Investor** | Their own persona locally. Verdict (`Eligible` / `Ineligible`). Criteria main-statements (the five public lines on the project page). |
+| **Investor** | Their own persona locally. Verdict (`Eligible` / `Ineligible`). Criteria main-statements (the public lines on the project page). |
 | **Foundation** | Aggregate counts (`N eligible subscribers`). Criteria they themselves wrote. `evidence_summary` (wallet count, avg holding days, DAO vote total, `github_included` bool, 280-char PII-scrubbed rationale). |
-| **Operator / TEE runner** | Nothing the TEE doesn't log. All logs are PII-masked at emission. |
+| **Launchpad operator / TEE runner** | Nothing the TEE doesn't log. All logs are PII-masked at emission. |
 | **Chain** | ZK proof + `eligible` bit. `payload_hash` commitment. TEE signature. That's it. |
 | **Anyone else** | Public policy metadata. Total pending contributions. Settlement outcomes. No investor addresses. |
 
@@ -230,7 +234,7 @@ The invariants that enforce this:
 
 **Phase 2 — Frictionless EVM.** Investors participate using only MetaMask. Qualie auto-creates a meta-account via Chain Signatures; contributions are paid in EVM stablecoins; claims settle to any chain. The user never sees they are touching NEAR.
 
-**Phase 3 — Portable Attestations.** The signed `AttestationBundle` becomes a reusable credential. Other launchpads (and potentially any access-gated protocol) can accept it as proof of prior screening without re-running the evaluation. The attestation lives in the investor's wallet, not on the launchpad's database.
+**Phase 3 — Portable Attestations beyond IDOs.** The signed `AttestationBundle` becomes a reusable credential for any gated action where the same four-party tension exists — RWA issuance, gated governance, private airdrops, exclusive communities. The evaluation has to happen; nobody gets to keep the evidence. The primitive is not specific to IDOs.
 
 ---
 
@@ -326,8 +330,8 @@ python3 scripts/deploy/register_mock_policies.py
 
 ## Acknowledgements
 
-Built for **BuidlHack 2026 · Korea Buidl Week**, NEAR AI / General Track. The privacy model owes its shape to the constraint that the foundation _must not_ be able to cheat its own rules — every other decision flowed from that.
+Built for **BuidlHack 2026 · Korea Buidl Week**, NEAR AI / General Track.
 
 ---
 
-_Privacy is not a feature. It's an invariant._
+_The evaluation has to happen. Nobody gets to keep the evidence._
