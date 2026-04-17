@@ -186,3 +186,136 @@ fn test_contribution_outcome_variants() {
     assert_ne!(ContributionOutcome::NotSettled, ContributionOutcome::FullMatch);
     assert_ne!(ContributionOutcome::PartialMatch, ContributionOutcome::NoMatch);
 }
+
+// ── Settle → Claim → Refund lifecycle (manual state) ────────────────────
+
+use ido_escrow::state::{compute_contribution_key as cck, PolicyInvestorKey};
+
+fn insert_settled_contribution(
+    escrow: &mut IdoEscrow,
+    investor: &AccountId,
+    policy_id: PolicyId,
+    amount: u128,
+    matched: u128,
+    outcome: ContributionOutcome,
+) {
+    let key = cck(investor, policy_id);
+    let c = Contribution {
+        investor: investor.clone(),
+        policy_id,
+        amount: U128(amount),
+        attestation_hash: [0u8; 32],
+        outcome,
+        matched_amount: U128(matched),
+        token_amount: U128(if matched > 0 { matched / 100 } else { 0 }),
+        token_contract: "token.testnet".parse().unwrap(),
+        claim_done: false,
+        refund_done: false,
+        created_at: 0,
+    };
+    escrow.contributions.insert(&key, &c);
+    let idx = escrow.policy_investor_count.get(&policy_id).unwrap_or(0);
+    escrow.policy_investors.insert(&PolicyInvestorKey { policy_id, index: idx }, investor);
+    escrow.policy_investor_count.insert(&policy_id, &(idx + 1));
+    let prev = escrow.policy_pending_total.get(&policy_id).unwrap_or(U128(0));
+    escrow.policy_pending_total.insert(&policy_id, &U128(prev.0 + amount));
+}
+
+#[test]
+fn test_claim_full_match_preconditions() {
+    let mut escrow = init_escrow();
+    insert_settled_contribution(&mut escrow, &investor1(), 0, 1000, 1000, ContributionOutcome::FullMatch);
+    testing_env!(context(investor1()).build());
+    let c = escrow.contributions.get(&cck(&investor1(), 0)).unwrap();
+    assert_eq!(c.outcome, ContributionOutcome::FullMatch);
+    assert!(!c.claim_done);
+    assert!(c.token_amount.0 > 0);
+}
+
+#[test]
+#[should_panic(expected = "NotSettled")]
+fn test_claim_not_settled_panics() {
+    let mut escrow = init_escrow();
+    insert_settled_contribution(&mut escrow, &investor1(), 0, 1000, 0, ContributionOutcome::NotSettled);
+    testing_env!(context(investor1()).build());
+    escrow.claim(0);
+}
+
+#[test]
+#[should_panic(expected = "NothingToClaim")]
+fn test_claim_no_match_panics() {
+    let mut escrow = init_escrow();
+    insert_settled_contribution(&mut escrow, &investor1(), 0, 1000, 0, ContributionOutcome::NoMatch);
+    testing_env!(context(investor1()).build());
+    escrow.claim(0);
+}
+
+#[test]
+#[should_panic(expected = "AlreadyClaimed")]
+fn test_claim_already_done_panics() {
+    let mut escrow = init_escrow();
+    insert_settled_contribution(&mut escrow, &investor1(), 0, 1000, 1000, ContributionOutcome::FullMatch);
+    let key = cck(&investor1(), 0);
+    let mut c = escrow.contributions.get(&key).unwrap();
+    c.claim_done = true;
+    escrow.contributions.insert(&key, &c);
+    testing_env!(context(investor1()).build());
+    escrow.claim(0);
+}
+
+#[test]
+fn test_refund_no_match_preconditions() {
+    let mut escrow = init_escrow();
+    insert_settled_contribution(&mut escrow, &investor1(), 0, 1000, 0, ContributionOutcome::NoMatch);
+    testing_env!(context(investor1()).build());
+    let c = escrow.contributions.get(&cck(&investor1(), 0)).unwrap();
+    assert!(!c.refund_done);
+    assert_eq!(c.amount.0 - c.matched_amount.0, 1000);
+}
+
+#[test]
+fn test_refund_partial_match_amount() {
+    let mut escrow = init_escrow();
+    insert_settled_contribution(&mut escrow, &investor1(), 0, 1000, 700, ContributionOutcome::PartialMatch);
+    testing_env!(context(investor1()).build());
+    let c = escrow.contributions.get(&cck(&investor1(), 0)).unwrap();
+    assert_eq!(c.amount.0 - c.matched_amount.0, 300);
+}
+
+#[test]
+#[should_panic(expected = "NothingToRefund")]
+fn test_refund_full_match_panics() {
+    let mut escrow = init_escrow();
+    insert_settled_contribution(&mut escrow, &investor1(), 0, 1000, 1000, ContributionOutcome::FullMatch);
+    testing_env!(context(investor1()).build());
+    escrow.refund(0);
+}
+
+#[test]
+#[should_panic(expected = "AlreadyRefunded")]
+fn test_refund_already_done_panics() {
+    let mut escrow = init_escrow();
+    insert_settled_contribution(&mut escrow, &investor1(), 0, 1000, 0, ContributionOutcome::NoMatch);
+    let key = cck(&investor1(), 0);
+    let mut c = escrow.contributions.get(&key).unwrap();
+    c.refund_done = true;
+    escrow.contributions.insert(&key, &c);
+    testing_env!(context(investor1()).build());
+    escrow.refund(0);
+}
+
+#[test]
+#[should_panic(expected = "ContributionNotFound")]
+fn test_claim_no_contribution_panics() {
+    let mut escrow = init_escrow();
+    testing_env!(context(investor1()).build());
+    escrow.claim(0);
+}
+
+#[test]
+#[should_panic(expected = "ContributionNotFound")]
+fn test_refund_no_contribution_panics() {
+    let mut escrow = init_escrow();
+    testing_env!(context(investor1()).build());
+    escrow.refund(0);
+}
