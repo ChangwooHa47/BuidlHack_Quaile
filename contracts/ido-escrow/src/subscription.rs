@@ -251,6 +251,8 @@ impl IdoEscrow {
     }
 
     /// Rollback contribution state and return refund amount.
+    /// Private: only callable by this contract (from callback handlers).
+    #[private]
     pub fn rollback_contribution(
         &mut self,
         investor: &AccountId,

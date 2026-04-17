@@ -16,6 +16,7 @@ export interface EvmWalletEntry {
   address: string;
   signature: string | null;
   message: string | null;
+  timestamp: string | null;
   signed: boolean;
 }
 
@@ -26,7 +27,7 @@ interface IdentityContextValue {
   githubToken: string | null;
   selfIntro: string;
   addEvmWallet: (chainId: number, address: string) => void;
-  markEvmSigned: (address: string, signature: string, message: string) => void;
+  markEvmSigned: (address: string, signature: string, message: string, timestamp: string) => void;
   removeEvmWallet: (address: string) => void;
   setGithubConnected: (v: boolean) => void;
   setGithubToken: (token: string | null) => void;
@@ -61,15 +62,15 @@ export function IdentityProvider({ children }: { children: ReactNode }) {
   const addEvmWallet = useCallback((chainId: number, address: string) => {
     setEvmWallets((prev) => {
       if (prev.some((w) => w.address.toLowerCase() === address.toLowerCase())) return prev;
-      return [...prev, { chainId, address, signature: null, message: null, signed: false }];
+      return [...prev, { chainId, address, signature: null, message: null, timestamp: null, signed: false }];
     });
   }, []);
 
-  const markEvmSigned = useCallback((address: string, signature: string, message: string) => {
+  const markEvmSigned = useCallback((address: string, signature: string, message: string, timestamp: string) => {
     setEvmWallets((prev) =>
       prev.map((w) =>
         w.address.toLowerCase() === address.toLowerCase()
-          ? { ...w, signature, message, signed: true }
+          ? { ...w, signature, message, timestamp, signed: true }
           : w,
       ),
     );

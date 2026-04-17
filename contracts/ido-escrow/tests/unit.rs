@@ -120,7 +120,8 @@ fn test_compute_nonce_key_deterministic() {
 #[test]
 fn test_rollback_removes_contribution() {
     let mut escrow = init_escrow();
-    testing_env!(context(owner()).build());
+    // rollback_contribution is #[private], predecessor must be current_account
+    testing_env!(context("ido-escrow.testnet".parse::<AccountId>().unwrap()).current_account_id("ido-escrow.testnet".parse::<AccountId>().unwrap()).build());
 
     use ido_escrow::state::{compute_contribution_key, compute_nonce_key, PolicyInvestorKey};
 
@@ -172,7 +173,7 @@ fn test_rollback_removes_contribution() {
 #[test]
 fn test_rollback_already_removed() {
     let mut escrow = init_escrow();
-    testing_env!(context(owner()).build());
+    testing_env!(context("ido-escrow.testnet".parse::<AccountId>().unwrap()).current_account_id("ido-escrow.testnet".parse::<AccountId>().unwrap()).build());
 
     let nonce = [0x42u8; 32];
     let refund = escrow.rollback_contribution(&investor1(), 1, nonce);

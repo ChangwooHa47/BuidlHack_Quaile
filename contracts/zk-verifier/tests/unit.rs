@@ -10,12 +10,22 @@ fn setup() -> ZkVerifier {
     testing_env!(context);
 
     let vk_json = r#"{"protocol":"groth16","curve":"bn128","nPublic":5}"#;
-    ZkVerifier::new("owner.testnet".parse().unwrap(), vk_json.to_string())
+    let mut contract = ZkVerifier::new("owner.testnet".parse().unwrap(), vk_json.to_string());
+    contract.set_escrow_account("escrow.testnet".parse().unwrap());
+    contract
+}
+
+fn escrow_context() {
+    let context = VMContextBuilder::new()
+        .predecessor_account_id("escrow.testnet".parse().unwrap())
+        .build();
+    testing_env!(context);
 }
 
 #[test]
 fn test_verify_proof_eligible() {
     let contract = setup();
+    escrow_context();
     let proof = r#"{"pi_a":["1","2"],"pi_b":[["1","2"],["3","4"]],"pi_c":["1","2"]}"#;
     let public = r#"["123","456","789","101","1"]"#;
     assert!(contract.verify_proof(proof.to_string(), public.to_string()));
@@ -24,6 +34,7 @@ fn test_verify_proof_eligible() {
 #[test]
 fn test_verify_proof_ineligible() {
     let contract = setup();
+    escrow_context();
     let proof = r#"{"pi_a":["1","2"],"pi_b":[["1","2"],["3","4"]],"pi_c":["1","2"]}"#;
     let public = r#"["123","456","789","101","0"]"#;
     assert!(!contract.verify_proof(proof.to_string(), public.to_string()));
@@ -32,9 +43,22 @@ fn test_verify_proof_ineligible() {
 #[test]
 fn test_verify_proof_wrong_input_count() {
     let contract = setup();
+    escrow_context();
     let proof = r#"{"pi_a":["1","2"]}"#;
     let public = r#"["123","456"]"#;
     assert!(!contract.verify_proof(proof.to_string(), public.to_string()));
+}
+
+#[test]
+#[should_panic(expected = "Unauthorized: only escrow may verify proofs")]
+fn test_verify_proof_unauthorized_caller() {
+    let contract = setup();
+    // Call from non-escrow account
+    let context = VMContextBuilder::new()
+        .predecessor_account_id("hacker.testnet".parse().unwrap())
+        .build();
+    testing_env!(context);
+    contract.verify_proof(r#"{}"#.to_string(), r#"["0","0","0","0","1"]"#.to_string());
 }
 
 #[test]

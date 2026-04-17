@@ -1,10 +1,18 @@
 export const SUPPORTED_CHAINS: Record<number, string> = {
+  // Mainnets
   1: "eip155:1",
   8453: "eip155:8453",
   42161: "eip155:42161",
   10: "eip155:10",
   137: "eip155:137",
   56: "eip155:56",
+  // Testnets
+  11155111: "eip155:11155111", // Sepolia
+  84532: "eip155:84532",       // Base Sepolia
+  421614: "eip155:421614",     // Arbitrum Sepolia
+  11155420: "eip155:11155420", // OP Sepolia
+  80002: "eip155:80002",       // Polygon Amoy
+  97: "eip155:97",             // BSC Testnet
 };
 
 export function buildCanonicalMessage(

@@ -232,16 +232,6 @@ async def process_persona(
             collection_errors=evm_errors + github_errors,
         )
 
-        try:
-            remote_report = await deps.report_client.fetch_report(
-                signing_address=deps.signer.address,
-                nonce_hex=persona.nonce.hex(),
-            )
-        except Exception as exc:
-            raise RemoteAttestationFailed(str(exc)) from exc
-        if not remote_report:
-            raise RemoteAttestationFailed("empty NEAR AI attestation report")
-
         # Prefer the admin-curated sub-criteria stored in natural_language.
         # Fall back to LLM structurize only for legacy policies that have
         # no sub-bullets (= free-form text predating the structured format).

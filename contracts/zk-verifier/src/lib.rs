@@ -7,6 +7,7 @@ use near_sdk::{env, near_bindgen, AccountId, PanicOnDefault};
 pub struct ZkVerifier {
     pub owner: AccountId,
     pub vk_json: String,
+    pub escrow_account: Option<AccountId>,
 }
 
 #[near_bindgen]
@@ -18,6 +19,7 @@ impl ZkVerifier {
         Self {
             owner,
             vk_json: verification_key_json,
+            escrow_account: None,
         }
     }
 
@@ -33,18 +35,33 @@ impl ZkVerifier {
         self.vk_json = verification_key_json;
     }
 
+    /// Owner-only: set the escrow account that is allowed to call verify_proof.
+    pub fn set_escrow_account(&mut self, escrow: AccountId) {
+        assert_eq!(env::predecessor_account_id(), self.owner, "Unauthorized");
+        self.escrow_account = Some(escrow);
+    }
+
     /// Verify a groth16 proof.
     ///
     /// `public_inputs_json`: `["limb0", "limb1", "limb2", "limb3", "eligible"]`
     ///
     /// MVP: validates structure and checks eligible == "1".
-    /// Actual pairing verification is done off-chain; see `register_verified_proof`.
-    /// Will switch to on-chain alt_bn128 pairing when NEAR precompile stabilizes.
+    /// Caller must be the registered escrow account — prevents external actors
+    /// from exploiting the stub verifier directly.
+    /// Actual pairing verification is done off-chain; will switch to on-chain
+    /// alt_bn128 pairing when NEAR precompile stabilizes.
     pub fn verify_proof(
         &self,
         proof_json: String,
         public_inputs_json: String,
     ) -> bool {
+        // Only the escrow contract may call verify_proof.
+        if let Some(ref escrow) = self.escrow_account {
+            assert_eq!(env::predecessor_account_id(), *escrow, "Unauthorized: only escrow may verify proofs");
+        } else {
+            env::panic_str("EscrowNotSet: call set_escrow_account first");
+        }
+
         let _proof: serde_json::Value =
             serde_json::from_str(&proof_json).expect("invalid proof JSON");
         let public_inputs: Vec<String> =

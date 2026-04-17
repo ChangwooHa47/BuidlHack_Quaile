@@ -94,7 +94,7 @@ export default function IdentityPage() {
       const signature = await sign(message);
 
       addEvmWallet(chainId, address);
-      markEvmSigned(address, signature, message);
+      markEvmSigned(address, signature, message, ts.toString());
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
       if (!msg.includes("rejected") && !msg.includes("denied")) {
@@ -124,15 +124,14 @@ export default function IdentityPage() {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const tsNs = nowNs().toString();
       const signedEvm = evmWallets
-        .filter((w) => w.signed && w.signature && w.message)
+        .filter((w) => w.signed && w.signature && w.message && w.timestamp)
         .map((w) => ({
           chain_id: w.chainId,
           address: w.address,
           signature: w.signature!,
           message: w.message!,
-          timestamp: tsNs,
+          timestamp: w.timestamp!,
         }));
       const nonce = generateNonce();
       const response = await submitPersona({
@@ -142,7 +141,7 @@ export default function IdentityPage() {
         self_intro: selfIntro,
         github_oauth_token: githubToken,
         nonce,
-        client_timestamp: tsNs,
+        client_timestamp: nowNs().toString(),
       });
       const verdict = response.bundle.payload.verdict;
       if (verdict === "Eligible") {
